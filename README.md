@@ -4,11 +4,11 @@ The **Definition Sourcer** is a SIE component that sources GSM (Generative Syste
 
 External artifacts are **definitions in their native form**. Code defines structure and behavior. Legislation defines principles, constraints, and obligations. Standards define quality requirements and compliance boundaries. The Definition Sourcer translates these native definitions into GSM primitives, closing the gap between the world's definitions and SIE's generative model.
 
-## Design Principles
+## Design Directives
 
 ### "Source artifacts ARE definitions"
 
-The Definition Sourcer does not *interpret* or *describe* external artifacts — it **translates** them. A Java service class IS a Component with Mechanisms. An ISO norm article IS a Principle. A GDPR obligation IS a Policy. The sourcer performs a faithful structural translation from the source's native definitional language into GSM's universal definitional language.
+The Definition Sourcer does not *interpret* or *describe* external artifacts — it **translates** them. A Java service class IS a Component with Mechanisms. An ISO norm article IS a Directive. A GDPR obligation IS a Policy. The sourcer performs a faithful structural translation from the source's native definitional language into GSM's universal definitional language.
 
 This is distinct from Description-plane observation (DSM). DSM observes runtime state and behavior. The Definition Sourcer operates entirely within the Definition plane: it takes definitional artifacts as input and produces definitional primitives as output.
 
@@ -35,12 +35,12 @@ Source Adapters are organized into **domain presets** — curated collections of
 
 Examples:
 - **IT domain preset**: Git Repository Adapter (code → Infrastructure + Organization), Helm Chart Adapter, OpenAPI Adapter, etc.
-- **Legal/Regulatory domain preset**: Legislation Adapter (legal texts → Constitution + Organization), Standards Adapter (ISO/IEC norms → PPR)
+- **Legal/Regulatory domain preset**: Legislation Adapter (legal texts → Constitution + Organization), Standards Adapter (ISO/IEC norms → DPR)
 - Future presets: Financial, Healthcare, Industrial, etc.
 
 ### SaaS multi-tenant model
 
-Legal/regulatory sources (GDPR, NIS2, ISO 27001, etc.) produce GSM definitions for **Systems representing legal entities** — the regulation itself modeled as a System with Purpose, Principles, Policies, and Rules. These definitions live in **SaaS SIE instances** and are consumed by tenants.
+Legal/regulatory sources (GDPR, NIS2, ISO 27001, etc.) produce GSM definitions for **Systems representing legal entities** — the regulation itself modeled as a System with Purpose, Directives, Policies, and Rules. These definitions live in **SaaS SIE instances** and are consumed by tenants.
 
 A tenant's Systems are **governed subjects** of these legal entity Systems. The governance relationship is:
 
@@ -50,7 +50,7 @@ LegalEntitySystem (GDPR)  ←→  TenantSystem (CustomerApp)
   Relationship: governance mandate
 ```
 
-The tenant's SIE instance sources the legal entity System's PPR through Relationship-based governance inheritance. The Definition Sourcer populates the upstream legal entity Systems; governance processes propagate constraints downstream.
+The tenant's SIE instance sources the legal entity System's DPR through Relationship-based governance inheritance. The Definition Sourcer populates the upstream legal entity Systems; governance processes propagate constraints downstream.
 
 ## Architecture
 
@@ -307,23 +307,23 @@ Source: code repositories.
 
 Source: published legislation and regulatory texts (GDPR, NIS2, DORA, etc.).
 
-The sourced System represents the **legal entity itself** (the regulation as a System). Its PPR encodes the regulatory requirements that governed Systems must satisfy.
+The sourced System represents the **legal entity itself** (the regulation as a System). Its DPR encodes the regulatory requirements that governed Systems must satisfy.
 
 **Constitution layer:**
 - Purpose (the regulation's objectives — e.g., "Protection of personal data", "Cybersecurity resilience")
-- Principle (normative requirements — e.g., "System MUST ENSURE lawfulness OF personal-data-processing")
+- Directive (normative requirements — e.g., "System MUST ENSURE lawfulness OF personal-data-processing")
 
 **Organization layer:**
 - Policy (measurable obligations derived from articles — e.g., data breach notification within 72 hours)
 - Rule (operational procedures mandated by articles — e.g., data subject access request handling)
 - Function (capabilities the regulation requires — e.g., "Data breach notification", "Impact assessment")
-- Operationalization (Principle → Policy → Rule chains tracing regulatory lineage)
+- Operationalization (Directive → Policy → Rule chains tracing regulatory lineage)
 
 **SaaS deployment model:**
 - Regulatory Systems are defined once in SaaS SIE instances
 - Tenant Systems establish Relationships (`GOVERNED_SUBJECT ↔ LEGISLATOR`) to regulatory Systems
-- Governance processes propagate regulatory PPR as constraints on tenant Systems
-- Tenant compliance is evaluated by the Supervision plane against regulatory PPR
+- Governance processes propagate regulatory DPR as constraints on tenant Systems
+- Tenant compliance is evaluated by the Supervision plane against regulatory DPR
 
 ### Standards Domain (Standards Adapter)
 
@@ -331,7 +331,7 @@ Source: published standards and norms (ISO 27001, ISO 9001, NIST CSF, CIS Benchm
 
 Similar to legal/regulatory, but with:
 - Purpose (the standard's objectives)
-- Principle (normative requirements from SHALL/SHOULD clauses)
+- Directive (normative requirements from SHALL/SHOULD clauses)
 - Policy (measurable controls — e.g., "Access control review frequency ≤ 90 days")
 - Function (control activities — e.g., "Access review", "Vulnerability scanning")
 - Operationalization (requirement → control → procedure chains)

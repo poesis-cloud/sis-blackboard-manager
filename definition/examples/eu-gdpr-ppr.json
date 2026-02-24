@@ -1,0 +1,710 @@
+{
+    "$schema": "gsm-system-definition-v1",
+    "_meta": {
+        "sourceAdapter": "legal-regulatory",
+        "sourceUri": "https://www.cnil.fr/fr/reglement-europeen-protection-donnees",
+        "sourceLabel": "CNIL — Règlement Général sur la Protection des Données (RGPD)",
+        "sourceAuthority": "EU Regulation 2016/679",
+        "extractionDate": "2026-02-23",
+        "definitionStatus": "DRAFT",
+        "provenance": {
+            "adapter": "legal-regulatory-v1",
+            "confidence": 0.92,
+            "humanReviewRequired": true,
+            "notes": "Auto-extracted from GDPR Chapters II (Principes) and III (Droits). Directives map 1:1 from Art. 5. Policies and Rules derived from Art. 6-23 obligations with measurable thresholds."
+        }
+    },
+    "system": {
+        "name": "EU-GDPR",
+        "archetype": "LegislativeFramework",
+        "purposes": [
+            {
+                "name": "protection-of-personal-data",
+                "archetype": "LegislativePurpose",
+                "_source": "Art. 1(2) — protection des personnes physiques à l'égard du traitement des données à caractère personnel"
+            },
+            {
+                "name": "free-movement-of-personal-data",
+                "archetype": "LegislativePurpose",
+                "_source": "Art. 1(3) — libre circulation des données à caractère personnel au sein de l'Union"
+            }
+        ],
+        "directives": [
+            {
+                "modal": "MUST",
+                "verb": "ENSURE",
+                "purposeQualifier": "lawfulness",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 5(1)(a) — licéité",
+                "_reads": "System MUST ENSURE lawfulness OF personal-data-processing"
+            },
+            {
+                "modal": "MUST",
+                "verb": "ENSURE",
+                "purposeQualifier": "fairness",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 5(1)(a) — loyauté",
+                "_reads": "System MUST ENSURE fairness OF personal-data-processing"
+            },
+            {
+                "modal": "MUST",
+                "verb": "ENSURE",
+                "purposeQualifier": "transparency",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 5(1)(a) — transparence",
+                "_reads": "System MUST ENSURE transparency OF personal-data-processing"
+            },
+            {
+                "modal": "MUST",
+                "verb": "ENSURE",
+                "purposeQualifier": "purpose-limitation",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 5(1)(b) — limitation des finalités",
+                "_reads": "System MUST ENSURE purpose-limitation OF personal-data-processing"
+            },
+            {
+                "modal": "MUST",
+                "verb": "MINIMIZE",
+                "purposeQualifier": "data-collection-scope",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 5(1)(c) — minimisation des données",
+                "_reads": "System MUST MINIMIZE data-collection-scope OF personal-data-processing"
+            },
+            {
+                "modal": "MUST",
+                "verb": "ENSURE",
+                "purposeQualifier": "accuracy",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 5(1)(d) — exactitude",
+                "_reads": "System MUST ENSURE accuracy OF personal-data-processing"
+            },
+            {
+                "modal": "MUST",
+                "verb": "MINIMIZE",
+                "purposeQualifier": "storage-duration",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 5(1)(e) — limitation de la conservation",
+                "_reads": "System MUST MINIMIZE storage-duration OF personal-data-processing"
+            },
+            {
+                "modal": "MUST",
+                "verb": "ENSURE",
+                "purposeQualifier": "integrity",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 5(1)(f) — intégrité",
+                "_reads": "System MUST ENSURE integrity OF personal-data-processing"
+            },
+            {
+                "modal": "MUST",
+                "verb": "ENSURE",
+                "purposeQualifier": "confidentiality",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 5(1)(f) — confidentialité",
+                "_reads": "System MUST ENSURE confidentiality OF personal-data-processing"
+            },
+            {
+                "modal": "MUST",
+                "verb": "ENSURE",
+                "purposeQualifier": "accountability",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 5(2) — responsabilité",
+                "_reads": "System MUST ENSURE accountability OF personal-data-processing"
+            },
+            {
+                "modal": "MUST",
+                "verb": "ENSURE",
+                "purposeQualifier": "consent-validity",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 7 — conditions applicables au consentement",
+                "_reads": "System MUST ENSURE consent-validity OF personal-data-processing"
+            },
+            {
+                "modal": "MUST",
+                "verb": "ENSURE",
+                "purposeQualifier": "data-subject-rights-accessibility",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 12 — transparence des informations et modalités",
+                "_reads": "System MUST ENSURE data-subject-rights-accessibility OF personal-data-processing"
+            },
+            {
+                "modal": "MUST",
+                "verb": "AVOID",
+                "purposeQualifier": "unlawful-automated-decision-making",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 22 — décision individuelle automatisée",
+                "_reads": "System MUST AVOID unlawful-automated-decision-making OF personal-data-processing"
+            },
+            {
+                "modal": "MUST",
+                "verb": "ENSURE",
+                "purposeQualifier": "special-category-data-protection",
+                "purposeScope": "protection-of-personal-data",
+                "_source": "Art. 9 — catégories particulières de données",
+                "_reads": "System MUST ENSURE special-category-data-protection OF personal-data-processing"
+            }
+        ],
+        "policies": [
+            {
+                "name": "lawful-basis-required",
+                "guard": null,
+                "predicate": "DataProcessingActivity.hasLawfulBasis == true",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 6(1) — le traitement n'est licite que si au moins une condition est remplie",
+                "_operationalizingDirectives": [
+                    "lawfulness"
+                ]
+            },
+            {
+                "name": "consent-demonstrability",
+                "guard": "DataProcessingActivity.lawfulBasis == \"consent\"",
+                "predicate": "DataProcessingActivity.consentRecord != null",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 7(1) — le responsable du traitement est en mesure de démontrer que la personne concernée a donné son consentement",
+                "_operationalizingDirectives": [
+                    "consent-validity"
+                ]
+            },
+            {
+                "name": "consent-withdrawal-parity",
+                "guard": "DataProcessingActivity.lawfulBasis == \"consent\"",
+                "predicate": "DataProcessingActivity.withdrawalComplexity <= DataProcessingActivity.consentComplexity",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 7(3) — il est aussi simple de retirer que de donner son consentement",
+                "_operationalizingDirectives": [
+                    "consent-validity"
+                ]
+            },
+            {
+                "name": "data-subject-response-deadline",
+                "guard": null,
+                "predicate": "DataSubjectRequest.responseDelayDays <= 30",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 12(3) — dans les meilleurs délais et en tout état de cause dans un délai d'un mois",
+                "_operationalizingDirectives": [
+                    "data-subject-rights-accessibility"
+                ]
+            },
+            {
+                "name": "data-subject-response-extended-deadline",
+                "guard": "DataSubjectRequest.isComplex == true",
+                "predicate": "DataSubjectRequest.responseDelayDays <= 90",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 12(3) — ce délai peut être prolongé de deux mois, compte tenu de la complexité",
+                "_operationalizingDirectives": [
+                    "data-subject-rights-accessibility"
+                ]
+            },
+            {
+                "name": "data-subject-request-free-of-charge",
+                "guard": "DataSubjectRequest.isManifestlyUnfounded == false",
+                "predicate": "DataSubjectRequest.fee == 0",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 12(5) — aucun paiement n'est exigé",
+                "_operationalizingDirectives": [
+                    "data-subject-rights-accessibility"
+                ]
+            },
+            {
+                "name": "privacy-information-completeness",
+                "guard": null,
+                "predicate": "PrivacyNotice.includesControllerIdentity == true && PrivacyNotice.includesPurposes == true && PrivacyNotice.includesLegalBasis == true && PrivacyNotice.includesRetentionPeriod == true && PrivacyNotice.includesDataSubjectRights == true",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 13(1)(2) — informations à fournir lors de la collecte",
+                "_operationalizingDirectives": [
+                    "transparency"
+                ]
+            },
+            {
+                "name": "child-consent-age-threshold",
+                "guard": "DataSubject.isChild == true && DataProcessingActivity.isInformationSocietyService == true",
+                "predicate": "DataSubject.age >= 16 || DataProcessingActivity.parentalConsentObtained == true",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 8(1) — le traitement est licite lorsque l'enfant est âgé d'au moins 16 ans",
+                "_operationalizingDirectives": [
+                    "consent-validity",
+                    "special-category-data-protection"
+                ]
+            },
+            {
+                "name": "special-category-processing-prohibition",
+                "guard": "PersonalData.isSpecialCategory == true",
+                "predicate": "DataProcessingActivity.hasArt9Exemption == true",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 9(1)(2) — le traitement est interdit sauf si une des conditions est remplie",
+                "_operationalizingDirectives": [
+                    "special-category-data-protection"
+                ]
+            },
+            {
+                "name": "data-portability-format",
+                "guard": "DataSubjectRequest.type == \"portability\"",
+                "predicate": "DataExport.format IN [\"structured\", \"commonly-used\", \"machine-readable\"]",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 20(1) — dans un format structuré, couramment utilisé et lisible par machine",
+                "_operationalizingDirectives": [
+                    "data-subject-rights-accessibility"
+                ]
+            },
+            {
+                "name": "automated-decision-human-intervention",
+                "guard": "DataProcessingActivity.involvesAutomatedDecisionMaking == true && DataProcessingActivity.producesLegalEffects == true",
+                "predicate": "DataProcessingActivity.humanInterventionAvailable == true",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 22(3) — au moins du droit d'obtenir une intervention humaine",
+                "_operationalizingDirectives": [
+                    "unlawful-automated-decision-making"
+                ]
+            },
+            {
+                "name": "retention-period-bounded",
+                "guard": null,
+                "predicate": "PersonalData.retentionPeriodDefined == true && PersonalData.retentionJustification != null",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 5(1)(e) — durée n'excédant pas celle nécessaire au regard des finalités",
+                "_operationalizingDirectives": [
+                    "storage-duration"
+                ]
+            },
+            {
+                "name": "data-adequacy-for-purpose",
+                "guard": null,
+                "predicate": "DataProcessingActivity.dataFieldCount <= DataProcessingActivity.purposeRequiredFieldCount",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 5(1)(c) — adéquates, pertinentes et limitées à ce qui est nécessaire",
+                "_operationalizingDirectives": [
+                    "data-collection-scope"
+                ]
+            },
+            {
+                "name": "rectification-notification-to-recipients",
+                "guard": "PersonalData.hasBeenSharedWithRecipients == true",
+                "predicate": "RectificationAction.recipientsNotified == true",
+                "toleranceMode": "INSTANTANEOUS",
+                "_source": "Art. 19 — le responsable notifie à chaque destinataire toute rectification ou effacement",
+                "_operationalizingDirectives": [
+                    "accuracy",
+                    "data-subject-rights-accessibility"
+                ]
+            }
+        ],
+        "rules": [
+            {
+                "name": "handle-access-request",
+                "language": "STARLARK",
+                "body": "evt = on(\"DataSubjectAccessRequest\")\nsubject = sys.acquire(\"DataSubject\", {\"id\": evt[\"dataSubjectId\"]})\nif subject == None:\n    sys.emit(\"RequestDenied\", {\"requestId\": evt[\"requestId\"], \"reason\": \"identity-not-verified\"})\nelse:\n    records = sys.acquire(\"PersonalData\", {\"dataSubjectId\": evt[\"dataSubjectId\"]})\n    sys.emit(\"AccessResponseProvided\", {\n        \"requestId\": evt[\"requestId\"],\n        \"dataSubjectId\": evt[\"dataSubjectId\"],\n        \"purposes\": records[\"purposes\"],\n        \"categories\": records[\"categories\"],\n        \"recipients\": records[\"recipients\"],\n        \"retentionPeriod\": records[\"retentionPeriod\"],\n        \"source\": records[\"source\"],\n        \"responseDate\": now()\n    })",
+                "_source": "Art. 15 — Droit d'accès de la personne concernée",
+                "_operationalizingPolicies": [
+                    "data-subject-response-deadline"
+                ],
+                "_scopingFunctions": [
+                    "process-data-subject-request"
+                ]
+            },
+            {
+                "name": "handle-erasure-request",
+                "language": "STARLARK",
+                "body": "evt = on(\"DataSubjectErasureRequest\")\nsubject = sys.acquire(\"DataSubject\", {\"id\": evt[\"dataSubjectId\"]})\nif subject == None:\n    sys.emit(\"RequestDenied\", {\"requestId\": evt[\"requestId\"], \"reason\": \"identity-not-verified\"})\nelse:\n    records = sys.acquire(\"PersonalData\", {\"dataSubjectId\": evt[\"dataSubjectId\"]})\n    has_exemption = records[\"hasLegalRetentionObligation\"] or records[\"requiredForLegalClaim\"]\n    if has_exemption:\n        sys.emit(\"ErasureRefused\", {\n            \"requestId\": evt[\"requestId\"],\n            \"reason\": \"legal-exemption\",\n            \"exemptionBasis\": records[\"exemptionBasis\"]\n        })\n    else:\n        result = sys.delete(\"PersonalData\", {\"dataSubjectId\": evt[\"dataSubjectId\"]})\n        sys.emit(\"ErasureCompleted\", {\n            \"requestId\": evt[\"requestId\"],\n            \"dataSubjectId\": evt[\"dataSubjectId\"],\n            \"erasedAt\": now()\n        })",
+                "_source": "Art. 17 — Droit à l'effacement (droit à l'oubli)",
+                "_operationalizingPolicies": [
+                    "data-subject-response-deadline"
+                ],
+                "_scopingFunctions": [
+                    "process-data-subject-request",
+                    "erase-personal-data"
+                ]
+            },
+            {
+                "name": "handle-rectification-request",
+                "language": "STARLARK",
+                "body": "evt = on(\"DataSubjectRectificationRequest\")\nsubject = sys.acquire(\"DataSubject\", {\"id\": evt[\"dataSubjectId\"]})\nif subject == None:\n    sys.emit(\"RequestDenied\", {\"requestId\": evt[\"requestId\"], \"reason\": \"identity-not-verified\"})\nelse:\n    result = sys.modify(\"PersonalData\", {\n        \"dataSubjectId\": evt[\"dataSubjectId\"]\n    }, {\n        \"correctedFields\": evt[\"corrections\"]\n    })\n    sys.emit(\"RectificationCompleted\", {\n        \"requestId\": evt[\"requestId\"],\n        \"dataSubjectId\": evt[\"dataSubjectId\"],\n        \"correctedFields\": evt[\"corrections\"],\n        \"rectifiedAt\": now()\n    })\n    sys.emit(\"RecipientNotificationRequired\", {\n        \"dataSubjectId\": evt[\"dataSubjectId\"],\n        \"action\": \"rectification\",\n        \"correctedFields\": evt[\"corrections\"]\n    })",
+                "_source": "Art. 16 + Art. 19 — Droit de rectification + Obligation de notification",
+                "_operationalizingPolicies": [
+                    "data-subject-response-deadline",
+                    "rectification-notification-to-recipients"
+                ],
+                "_scopingFunctions": [
+                    "process-data-subject-request",
+                    "rectify-personal-data"
+                ]
+            },
+            {
+                "name": "handle-portability-request",
+                "language": "STARLARK",
+                "body": "evt = on(\"DataSubjectPortabilityRequest\")\nsubject = sys.acquire(\"DataSubject\", {\"id\": evt[\"dataSubjectId\"]})\nif subject == None:\n    sys.emit(\"RequestDenied\", {\"requestId\": evt[\"requestId\"], \"reason\": \"identity-not-verified\"})\nelse:\n    records = sys.acquire(\"PersonalData\", {\"dataSubjectId\": evt[\"dataSubjectId\"]})\n    export = sys.create(\"DataExport\", {\n        \"dataSubjectId\": evt[\"dataSubjectId\"],\n        \"format\": \"structured\",\n        \"content\": records,\n        \"exportedAt\": now()\n    })\n    if evt[\"directTransfer\"] and evt[\"targetController\"]:\n        sys.emit(\"DirectTransferInitiated\", {\n            \"requestId\": evt[\"requestId\"],\n            \"targetController\": evt[\"targetController\"],\n            \"exportId\": export[\"id\"]\n        })\n    else:\n        sys.emit(\"PortabilityExportReady\", {\n            \"requestId\": evt[\"requestId\"],\n            \"exportId\": export[\"id\"]\n        })",
+                "_source": "Art. 20 — Droit à la portabilité des données",
+                "_operationalizingPolicies": [
+                    "data-portability-format",
+                    "data-subject-response-deadline"
+                ],
+                "_scopingFunctions": [
+                    "process-data-subject-request",
+                    "export-personal-data"
+                ]
+            },
+            {
+                "name": "handle-objection",
+                "language": "STARLARK",
+                "body": "evt = on(\"DataSubjectObjection\")\nsubject = sys.acquire(\"DataSubject\", {\"id\": evt[\"dataSubjectId\"]})\nif subject == None:\n    sys.emit(\"RequestDenied\", {\"requestId\": evt[\"requestId\"], \"reason\": \"identity-not-verified\"})\nelse:\n    activity = sys.acquire(\"DataProcessingActivity\", {\"id\": evt[\"processingActivityId\"]})\n    if activity[\"lawfulBasis\"] == \"direct-marketing\":\n        result = sys.modify(\"DataProcessingActivity\", {\n            \"id\": evt[\"processingActivityId\"]\n        }, {\n            \"status\": \"ceased\",\n            \"ceaseReason\": \"data-subject-objection-direct-marketing\"\n        })\n        sys.emit(\"ObjectionAccepted\", {\n            \"requestId\": evt[\"requestId\"],\n            \"processingActivityId\": evt[\"processingActivityId\"]\n        })\n    elif activity[\"hasCompellingLegitimateGrounds\"]:\n        sys.emit(\"ObjectionRefused\", {\n            \"requestId\": evt[\"requestId\"],\n            \"reason\": \"compelling-legitimate-grounds\",\n            \"grounds\": activity[\"legitimateGrounds\"]\n        })\n    else:\n        result = sys.modify(\"DataProcessingActivity\", {\n            \"id\": evt[\"processingActivityId\"]\n        }, {\n            \"status\": \"ceased\",\n            \"ceaseReason\": \"data-subject-objection\"\n        })\n        sys.emit(\"ObjectionAccepted\", {\n            \"requestId\": evt[\"requestId\"],\n            \"processingActivityId\": evt[\"processingActivityId\"]\n        })",
+                "_source": "Art. 21 — Droit d'opposition",
+                "_operationalizingPolicies": [
+                    "data-subject-response-deadline"
+                ],
+                "_scopingFunctions": [
+                    "process-data-subject-request",
+                    "cease-processing"
+                ]
+            },
+            {
+                "name": "handle-processing-restriction-request",
+                "language": "STARLARK",
+                "body": "evt = on(\"DataSubjectRestrictionRequest\")\nsubject = sys.acquire(\"DataSubject\", {\"id\": evt[\"dataSubjectId\"]})\nif subject == None:\n    sys.emit(\"RequestDenied\", {\"requestId\": evt[\"requestId\"], \"reason\": \"identity-not-verified\"})\nelse:\n    result = sys.modify(\"PersonalData\", {\n        \"dataSubjectId\": evt[\"dataSubjectId\"]\n    }, {\n        \"processingRestricted\": True,\n        \"restrictionReason\": evt[\"reason\"],\n        \"restrictedAt\": now()\n    })\n    sys.emit(\"RestrictionApplied\", {\n        \"requestId\": evt[\"requestId\"],\n        \"dataSubjectId\": evt[\"dataSubjectId\"]\n    })",
+                "_source": "Art. 18 — Droit à la limitation du traitement",
+                "_operationalizingPolicies": [
+                    "data-subject-response-deadline"
+                ],
+                "_scopingFunctions": [
+                    "process-data-subject-request",
+                    "restrict-processing"
+                ]
+            },
+            {
+                "name": "validate-processing-lawfulness",
+                "language": "STARLARK",
+                "body": "evt = on(\"DataProcessingActivityCreated\")\nactivity = sys.acquire(\"DataProcessingActivity\", {\"id\": evt[\"activityId\"]})\nlawful_bases = [\"consent\", \"contract\", \"legal-obligation\", \"vital-interests\", \"public-interest\", \"legitimate-interests\"]\nif activity[\"lawfulBasis\"] not in lawful_bases:\n    sys.emit(\"LawfulnessViolation\", {\n        \"activityId\": evt[\"activityId\"],\n        \"declaredBasis\": activity[\"lawfulBasis\"],\n        \"validBases\": lawful_bases,\n        \"severity\": \"ERROR\"\n    })\nelse:\n    sys.emit(\"LawfulnessValidated\", {\n        \"activityId\": evt[\"activityId\"],\n        \"lawfulBasis\": activity[\"lawfulBasis\"]\n    })",
+                "_source": "Art. 6(1) — conditions de licéité du traitement",
+                "_operationalizingPolicies": [
+                    "lawful-basis-required"
+                ],
+                "_scopingFunctions": [
+                    "validate-processing-lawfulness"
+                ]
+            },
+            {
+                "name": "enforce-consent-withdrawal",
+                "language": "STARLARK",
+                "body": "evt = on(\"ConsentWithdrawn\")\nactivities = sys.acquire(\"DataProcessingActivity\", {\n    \"dataSubjectId\": evt[\"dataSubjectId\"],\n    \"lawfulBasis\": \"consent\"\n})\nfor activity_id in activities[\"ids\"]:\n    alt_basis = sys.acquire(\"DataProcessingActivity\", {\"id\": activity_id})\n    if not alt_basis[\"hasAlternativeLawfulBasis\"]:\n        result = sys.modify(\"DataProcessingActivity\", {\n            \"id\": activity_id\n        }, {\n            \"status\": \"ceased\",\n            \"ceaseReason\": \"consent-withdrawn\",\n            \"ceasedAt\": now()\n        })\n        sys.emit(\"ProcessingCeasedDueToConsentWithdrawal\", {\n            \"activityId\": activity_id,\n            \"dataSubjectId\": evt[\"dataSubjectId\"]\n        })",
+                "_source": "Art. 7(3) — la personne concernée a le droit de retirer son consentement à tout moment",
+                "_operationalizingPolicies": [
+                    "consent-demonstrability"
+                ],
+                "_scopingFunctions": [
+                    "enforce-consent-withdrawal",
+                    "cease-processing"
+                ]
+            }
+        ],
+        "functions": [
+            {
+                "name": "process-data-subject-request",
+                "_source": "Art. 12-22 — Droits de la personne concernée"
+            },
+            {
+                "name": "erase-personal-data",
+                "_source": "Art. 17 — Droit à l'effacement"
+            },
+            {
+                "name": "rectify-personal-data",
+                "_source": "Art. 16 — Droit de rectification"
+            },
+            {
+                "name": "export-personal-data",
+                "_source": "Art. 20 — Droit à la portabilité"
+            },
+            {
+                "name": "cease-processing",
+                "_source": "Art. 21 — Droit d'opposition"
+            },
+            {
+                "name": "restrict-processing",
+                "_source": "Art. 18 — Limitation du traitement"
+            },
+            {
+                "name": "validate-processing-lawfulness",
+                "_source": "Art. 6 — Licéité du traitement"
+            },
+            {
+                "name": "enforce-consent-withdrawal",
+                "_source": "Art. 7(3) — Retrait du consentement"
+            }
+        ],
+        "eventArchetypes": [
+            {
+                "name": "DataSubjectAccessRequest",
+                "_source": "Art. 15"
+            },
+            {
+                "name": "DataSubjectErasureRequest",
+                "_source": "Art. 17"
+            },
+            {
+                "name": "DataSubjectRectificationRequest",
+                "_source": "Art. 16"
+            },
+            {
+                "name": "DataSubjectPortabilityRequest",
+                "_source": "Art. 20"
+            },
+            {
+                "name": "DataSubjectObjection",
+                "_source": "Art. 21"
+            },
+            {
+                "name": "DataSubjectRestrictionRequest",
+                "_source": "Art. 18"
+            },
+            {
+                "name": "DataProcessingActivityCreated",
+                "_source": "Art. 6"
+            },
+            {
+                "name": "ConsentWithdrawn",
+                "_source": "Art. 7(3)"
+            },
+            {
+                "name": "AccessResponseProvided",
+                "_source": "Art. 15 (response)"
+            },
+            {
+                "name": "ErasureCompleted",
+                "_source": "Art. 17 (completion)"
+            },
+            {
+                "name": "ErasureRefused",
+                "_source": "Art. 17(3) (exemption)"
+            },
+            {
+                "name": "RectificationCompleted",
+                "_source": "Art. 16 (completion)"
+            },
+            {
+                "name": "RecipientNotificationRequired",
+                "_source": "Art. 19"
+            },
+            {
+                "name": "PortabilityExportReady",
+                "_source": "Art. 20 (export)"
+            },
+            {
+                "name": "DirectTransferInitiated",
+                "_source": "Art. 20(2) (direct transfer)"
+            },
+            {
+                "name": "ObjectionAccepted",
+                "_source": "Art. 21 (accepted)"
+            },
+            {
+                "name": "ObjectionRefused",
+                "_source": "Art. 21(1) (legitimate grounds)"
+            },
+            {
+                "name": "RestrictionApplied",
+                "_source": "Art. 18 (applied)"
+            },
+            {
+                "name": "RequestDenied",
+                "_source": "Art. 12(6) (identity doubt)"
+            },
+            {
+                "name": "LawfulnessViolation",
+                "_source": "Art. 6 (violation)"
+            },
+            {
+                "name": "LawfulnessValidated",
+                "_source": "Art. 6 (validated)"
+            },
+            {
+                "name": "ProcessingCeasedDueToConsentWithdrawal",
+                "_source": "Art. 7(3)"
+            }
+        ],
+        "stateObjectArchetypes": [
+            {
+                "name": "DataSubject",
+                "_source": "Art. 4(1) — personne concernée",
+                "_properties": [
+                    "id",
+                    "age",
+                    "isChild",
+                    "identityVerified"
+                ]
+            },
+            {
+                "name": "PersonalData",
+                "_source": "Art. 4(1) — données à caractère personnel",
+                "_properties": [
+                    "dataSubjectId",
+                    "categories",
+                    "purposes",
+                    "recipients",
+                    "retentionPeriod",
+                    "source",
+                    "isSpecialCategory",
+                    "processingRestricted",
+                    "retentionPeriodDefined",
+                    "retentionJustification",
+                    "hasBeenSharedWithRecipients",
+                    "hasLegalRetentionObligation",
+                    "requiredForLegalClaim",
+                    "exemptionBasis"
+                ]
+            },
+            {
+                "name": "DataProcessingActivity",
+                "_source": "Art. 30 — registre des activités de traitement",
+                "_properties": [
+                    "id",
+                    "dataSubjectId",
+                    "lawfulBasis",
+                    "hasLawfulBasis",
+                    "consentRecord",
+                    "withdrawalComplexity",
+                    "consentComplexity",
+                    "isInformationSocietyService",
+                    "parentalConsentObtained",
+                    "hasArt9Exemption",
+                    "involvesAutomatedDecisionMaking",
+                    "producesLegalEffects",
+                    "humanInterventionAvailable",
+                    "status",
+                    "ceaseReason",
+                    "hasCompellingLegitimateGrounds",
+                    "legitimateGrounds",
+                    "hasAlternativeLawfulBasis",
+                    "dataFieldCount",
+                    "purposeRequiredFieldCount"
+                ]
+            },
+            {
+                "name": "DataSubjectRequest",
+                "_source": "Art. 12(3) — demande de la personne concernée",
+                "_properties": [
+                    "requestId",
+                    "dataSubjectId",
+                    "type",
+                    "responseDelayDays",
+                    "isComplex",
+                    "isManifestlyUnfounded",
+                    "fee"
+                ]
+            },
+            {
+                "name": "PrivacyNotice",
+                "_source": "Art. 13-14 — informations à fournir",
+                "_properties": [
+                    "includesControllerIdentity",
+                    "includesPurposes",
+                    "includesLegalBasis",
+                    "includesRetentionPeriod",
+                    "includesDataSubjectRights"
+                ]
+            },
+            {
+                "name": "DataExport",
+                "_source": "Art. 20 — portabilité",
+                "_properties": [
+                    "id",
+                    "dataSubjectId",
+                    "format",
+                    "content",
+                    "exportedAt"
+                ]
+            },
+            {
+                "name": "RectificationAction",
+                "_source": "Art. 19 — notification aux destinataires",
+                "_properties": [
+                    "dataSubjectId",
+                    "correctedFields",
+                    "recipientsNotified"
+                ]
+            }
+        ],
+        "operationalizations": [
+            {
+                "_comment": "Art. 5(1)(a) → Art. 6 → validate-processing-lawfulness",
+                "directive": "lawfulness",
+                "policy": "lawful-basis-required",
+                "rule": "validate-processing-lawfulness"
+            },
+            {
+                "_comment": "Art. 5(1)(a) → Art. 7(1) → enforce-consent-withdrawal",
+                "directive": "consent-validity",
+                "policy": "consent-demonstrability",
+                "rule": "enforce-consent-withdrawal"
+            },
+            {
+                "_comment": "Art. 5(1)(a) → Art. 7(3) → consent-withdrawal-parity (no rule yet)",
+                "directive": "consent-validity",
+                "policy": "consent-withdrawal-parity",
+                "rule": null
+            },
+            {
+                "_comment": "Art. 12 → Art. 12(3) → handle-access-request",
+                "directive": "data-subject-rights-accessibility",
+                "policy": "data-subject-response-deadline",
+                "rule": "handle-access-request"
+            },
+            {
+                "_comment": "Art. 12 → Art. 12(3) → handle-erasure-request",
+                "directive": "data-subject-rights-accessibility",
+                "policy": "data-subject-response-deadline",
+                "rule": "handle-erasure-request"
+            },
+            {
+                "_comment": "Art. 12 → Art. 12(3) → handle-rectification-request",
+                "directive": "data-subject-rights-accessibility",
+                "policy": "data-subject-response-deadline",
+                "rule": "handle-rectification-request"
+            },
+            {
+                "_comment": "Art. 12 → Art. 20(1) → handle-portability-request",
+                "directive": "data-subject-rights-accessibility",
+                "policy": "data-portability-format",
+                "rule": "handle-portability-request"
+            },
+            {
+                "_comment": "Art. 12 → Art. 12(3) → handle-objection",
+                "directive": "data-subject-rights-accessibility",
+                "policy": "data-subject-response-deadline",
+                "rule": "handle-objection"
+            },
+            {
+                "_comment": "Art. 12 → Art. 12(5) → (no rule — structural policy)",
+                "directive": "data-subject-rights-accessibility",
+                "policy": "data-subject-request-free-of-charge",
+                "rule": null
+            },
+            {
+                "_comment": "Art. 5(1)(a) → Art. 13 → (no rule — structural policy)",
+                "directive": "transparency",
+                "policy": "privacy-information-completeness",
+                "rule": null
+            },
+            {
+                "_comment": "Art. 22 → Art. 22(3) → (no rule yet — structural policy)",
+                "directive": "unlawful-automated-decision-making",
+                "policy": "automated-decision-human-intervention",
+                "rule": null
+            },
+            {
+                "_comment": "Art. 5(1)(e) → Art. 5(1)(e) → (no rule — structural policy)",
+                "directive": "storage-duration",
+                "policy": "retention-period-bounded",
+                "rule": null
+            },
+            {
+                "_comment": "Art. 5(1)(c) → Art. 5(1)(c) → (no rule — structural policy)",
+                "directive": "data-collection-scope",
+                "policy": "data-adequacy-for-purpose",
+                "rule": null
+            },
+            {
+                "_comment": "Art. 5(1)(d) → Art. 19 → handle-rectification-request",
+                "directive": "accuracy",
+                "policy": "rectification-notification-to-recipients",
+                "rule": "handle-rectification-request"
+            }
+        ],
+        "_structural_traceability_note": "Function↔Purpose traceability is now structural (no Realization primitive): Function ← Mechanism/Controller → Rule → Operationalization → Policy → Directive → Purpose. Each Mechanism references exactly one Function; Controllers are auto-derived from Rule bodies."
+    }
+}
