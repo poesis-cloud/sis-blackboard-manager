@@ -8,7 +8,7 @@ External artifacts are **definitions in their native form**. Code defines struct
 
 ### "Source artifacts ARE definitions"
 
-The Definition Sourcer does not *interpret* or *describe* external artifacts — it **translates** them. A Java service class IS a Structure with Mechanisms. An ISO norm article IS a Directive. A GDPR obligation IS a Norm. The sourcer performs a faithful structural translation from the source's native definitional language into GSM's universal definitional language.
+The Definition Sourcer does not *interpret* or *describe* external artifacts — it **translates** them. A Java service class IS a Component with Mechanisms. An ISO norm article IS a Directive. A GDPR obligation IS a Policy. The sourcer performs a faithful structural translation from the source's native definitional language into GSM's universal definitional language.
 
 This is distinct from Description-plane observation (DSM). DSM observes runtime state and behavior. The Definition Sourcer operates entirely within the Definition plane: it takes definitional artifacts as input and produces definitional primitives as output.
 
@@ -30,27 +30,27 @@ Source Adapters are organized into **domain presets** — curated collections of
 
 - Adapter implementations for relevant source types
 - Class-to-GSM classification tables specific to the domain
-- Technical Archetype schemas relevant to the domain
+- Technical qualifier archetype schemas relevant to the domain
 - LLM prompt specializations for the domain
 
 Examples:
-
-- **IT domain preset**: Git Repository Adapter (code → GSM primitives), Helm Chart Adapter, OpenAPI Adapter, etc.
-- **Legal/Regulatory domain preset**: Legislation Adapter (legal texts → GSM primitives), Standards Adapter (ISO/IEC norms → DNA)
+- **IT domain preset**: Git Repository Adapter (code → Infrastructure + Organization), Helm Chart Adapter, OpenAPI Adapter, etc.
+- **Legal/Regulatory domain preset**: Legislation Adapter (legal texts → Constitution + Organization), Standards Adapter (ISO/IEC norms → DPR)
 - Future presets: Financial, Healthcare, Industrial, etc.
 
 ### SaaS multi-tenant model
 
-Legal/regulatory sources (GDPR, NIS2, ISO 27001, etc.) produce GSM definitions for **Systems representing legal entities** — the regulation itself modeled as a System with Purpose, Directives, and Norms. These definitions live in **SaaS SIE instances** and are consumed by tenants.
+Legal/regulatory sources (GDPR, NIS2, ISO 27001, etc.) produce GSM definitions for **Systems representing legal entities** — the regulation itself modeled as a System with Purpose, Directives, Policies, and Rules. These definitions live in **SaaS SIE instances** and are consumed by tenants.
 
 A tenant's Systems are **governed subjects** of these legal entity Systems. The governance relationship is:
 
 ```
-LegalEntitySystem (GDPR)  ──governs──▶  TenantSystem (CustomerApp)
-  (Governance expressed via Directives targeting tenant Structure purposes)
+LegalEntitySystem (GDPR)  ←→  TenantSystem (CustomerApp)
+  Role: LEGISLATOR              Role: GOVERNED_SUBJECT
+  Relationship: governance mandate
 ```
 
-The tenant's SIE instance sources the legal entity System's DNA through governance Directives. The Definition Sourcer populates the upstream legal entity Systems; governance processes propagate constraints downstream.
+The tenant's SIE instance sources the legal entity System's DPR through Relationship-based governance inheritance. The Definition Sourcer populates the upstream legal entity Systems; governance processes propagate constraints downstream.
 
 ## Architecture
 
@@ -70,7 +70,7 @@ The tenant's SIE instance sources the legal entity System's DNA through governan
 │  ┌──────────┐  ┌──────────┐                      │      │
 │  │ OUTPUT   │← │ VALIDATE │←─────────────────────┘      │
 │  │          │  │          │                              │
-│  │ GSM JSON │  │ GSM valid│                              │
+│  │ GSM JSON │  │ GSM rules│                              │
 │  │ + prove- │  │ + schema │                              │
 │  │   nance  │  │   checks │                              │
 │  └──────────┘  └──────────┘                              │
@@ -96,7 +96,7 @@ The adapter connects to the source and produces a **classified artifact manifest
 | Connect to source (clone, fetch, download) | Source Adapter |
 | Walk artifact tree | Source Adapter |
 | Classify each artifact by structural role | Source Adapter (domain-specific classification table) |
-| Build structural skeleton (Structure hierarchy, etc.) | Generic pipeline (from adapter classification) |
+| Build structural skeleton (Component hierarchy, etc.) | Generic pipeline (from adapter classification) |
 
 Output: classified artifact manifest + structural skeleton.
 
@@ -105,13 +105,11 @@ Output: classified artifact manifest + structural skeleton.
 Two extraction modes, applied per artifact:
 
 **Deterministic extraction** (parsers — preferred when available):
-
 - Structured artifacts with known schemas (OpenAPI, protobuf, SQL DDL, JSON Schema, AsyncAPI, legal article databases with structured fields)
 - Source Adapter provides the parser
 - Output tagged with `extractionMethod: "parser-deterministic"`
 
 **LLM extraction** (when no deterministic parser exists):
-
 - Semi-structured or unstructured artifacts (source code, legal prose, standard narrative text)
 - Generic pipeline manages the LLM call with structured JSON output
 - Source Adapter provides the **prompt specialization** (classification table, naming rules, domain-specific extraction instructions)
@@ -125,7 +123,7 @@ For LLM-extracted primitives only. The pipeline feeds extracted primitives back 
 
 - Does each extracted primitive faithfully represent the source artifact?
 - Are cross-references consistent (names resolve, archetypes exist)?
-- Are definitions accurately captured?
+- Are qualifiers accurately captured?
 
 Maximum 3 verification iterations. On convergence, primitives are marked `coherenceVerified: true`.
 
@@ -138,14 +136,14 @@ Combines deterministic and LLM extractions:
 - Name normalization (adapter-specific naming conventions)
 - Duplicate detection (exact match → merge; near-duplicate → finding)
 - Cross-reference resolution (dangling references → ERROR finding)
-- Structural assembly (assign Mechanisms to Structures, derive Interfaces, etc.)
+- Structural assembly (assign Mechanisms to Components, derive Interfaces, etc.)
 
 #### Phase 5: SUPERSESSION DETECTION (deterministic, incremental only)
 
 When prior GSM definitions exist for the same System:
 
 - Match extracted primitives to existing by deterministic ID, provenance path, or name
-- Diff content (schema, rule, definition)
+- Diff content (schema, body, qualifiers)
 - Changed → mark new as `supersedes` existing
 - Unchanged → skip
 - Removed from source → finding: "source removed"
@@ -155,16 +153,16 @@ When prior GSM definitions exist for the same System:
 GSM consistency rules:
 
 - Every Mechanism has ≥ 1 Receptor and ≥ 1 Effector
-- Every Receptor/Effector bound to exactly 1 Archetype
-- Every Interaction has compatible effector/receptor Archetypes
-- Every Mechanism rule begins with `on("ArchetypeName")`
-- Every `on()` argument resolves to a defined Archetype
+- Every Receptor/Effector bound to exactly 1 EventArchetype
+- Every Interaction has compatible effector/receptor EventArchetypes
+- Every Rule body begins with `on("EventArchetypeName")`
+- Every `on()` argument resolves to a defined EventArchetype
 - Name uniqueness per primitive type
 - Name length ≤ 80 chars
 - Schema.uri uniqueness
-- Structure definitions: no circular references
+- Component containment: no circular parent-child
 - Schemas are valid JSON Schemas
-- Ascription definitions conform to Archetype schemas
+- Qualifier values conform to Qualifier Schemas
 - Provenance completeness (every primitive has provenance)
 
 Output: findings array (ERROR, WARNING, INFO).
@@ -206,10 +204,10 @@ SourceAdapter
 │   - Classification rules
 │   - Naming conventions
 │   - Extraction instructions
-│   - Archetype schemas
+│   - Qualifier Schemas
 │
-├── getArchetypeSchemas(): Schema[]
-│   Returns Archetype schemas relevant
+├── getQualifierSchemas(): Schema[]
+│   Returns Qualifier Schemas relevant
 │   to this source type
 │
 └── getNamingConventions(): NamingRules
@@ -257,101 +255,88 @@ The `sourceType` and `schemaSourceType` fields enable filtering and trust differ
 
 Source: code repositories.
 
-> **⚠️ STALE SECTION.** The layer-based organization (Infrastructure/Organization) and several primitives listed below (Component, Channel, EventArchetype, StateObjectArchetype, Qualifier, Controller, Actuator, Sensor, Actuation, Sensing) are eliminated in current GSM. Current GSM uses: Structure (not Component), Archetype (single kind, replacing EventArchetype + StateObjectArchetype), Mechanism with auto-derived Effectors/Receptors (replacing Controller/Actuator/Sensor), DNA (replacing DPR). This section needs conceptual redesign.
-
 **Infrastructure layer:**
-
-- ~~Component~~ → Structure (composite: repo → modules → packages)
+- Component (composite: repo → modules → packages)
 - Mechanism, Receptor, Effector
-- Interface, Interaction (Channel eliminated — expressed as Norms on Interactions)
-- Archetype (single kind, with JSON Schema)
+- Interface, Interaction, Channel
+- EventArchetype + Schema
+- StateObjectArchetype + Schema
 
 **Organization layer:**
-
-- ~~Rule~~ → Mechanism rule (Starlark translated from method logic — priority target)
+- Rule (Starlark body translated from method logic — priority target)
 - Function (from public methods/operations)
 
 **Auto-derived by Definition Manager (NOT by Sourcer):**
+- Controller, Actuator, Sensor (from Rule bodies)
+- Actuation, Sensing
 
-- Effectors, Receptors (auto-derived from Mechanism rules by Definition Manager)
-
-**Technical Archetype schemas extracted from code:**
-
+**Technical qualifier archetypes extracted from code:**
 - ErrorHandling, RetryPolicy, CachingPolicy, LoggingPolicy
 - TimeoutPolicy, CircuitBreaker, RateLimiting
 - TransactionScope, SecurityContext, Observability
-  (expressed as domain Archetype schemas)
 
 **Class-to-GSM classification table (IT/Git):**
 
 | Code pattern | Discriminant | GSM primitive |
 |---|---|---|
-| Service/handler class | Methods that receive input AND mutate state or produce events | methods → **Mechanism rules** |
-| Controller/endpoint class | Annotated endpoints (@RestController, @GrpcService, etc.) | endpoints → **Receptors** + methods → **Mechanism rules** |
-| Entity/model class | Persistent fields (@Entity, ORM model, Prisma model) | **Archetype** + fields → JSON Schema |
-| DTO/event/message class | Transferable payload, no business logic | **Archetype** + fields → JSON Schema |
-| Repository/DAO class | CRUD access to entities | Methods → **Functions** (no event trigger, not Mechanism rules) |
+| Service/handler class | Methods that receive input AND mutate state or produce events | **sub-Component** + methods → **Rules** |
+| Controller/endpoint class | Annotated endpoints (@RestController, @GrpcService, etc.) | **sub-Component** + endpoints → **Receptors** + methods → **Rules** |
+| Entity/model class | Persistent fields (@Entity, ORM model, Prisma model) | **StateObjectArchetype** + fields → **Schema** |
+| DTO/event/message class | Transferable payload, no business logic | **EventArchetype** + fields → **Schema** |
+| Repository/DAO class | CRUD access to entities | Methods → **Functions** (no event trigger, not Rules) |
 | Utility/helper class | Stateless, no I/O, no state mutation | Methods → **Functions** |
-| Configuration class | Application config, properties, feature flags | Properties → **Ascription** definitions on owning Structure |
+| Configuration class | Application config, properties, feature flags | Properties → **Qualifier** values on owning System |
 | Client/adapter class | Calls external services (HTTP client, SDK wrapper) | **Effectors** + **Interactions** (outbound) |
-| Listener/consumer class | Consumes events/messages (Kafka, RabbitMQ, SQS) | **Receptors** + methods → **Mechanism rules** |
+| Listener/consumer class | Consumes events/messages (Kafka, RabbitMQ, SQS) | **Receptors** + methods → **Rules** |
 
 **Method-to-Rule filter** (only behaviorally meaningful methods):
-
 - Receives an event/request/message (trigger)
 - Mutates state OR produces an event/response (effect)
 - Skip: getters, setters, toString, equals, hashCode, builders, pure formatters
 
 **Starlark translation contract:**
-
-- Method input (HTTP request, event payload) → `event = on("ArchetypeName")`
+- Method input (HTTP request, event payload) → `event = on("EventArchetypeName")`
 - DB/cache reads → `var = sys.acquire("ArchetypeName", filter)`
 - DB writes → `sys.create/modify/delete("ArchetypeName", data)`
-- Downstream calls, message publishing → `sys.emit("ArchetypeName", data)`
+- Downstream calls, message publishing → `sys.emit("EventArchetypeName", data)`
 - Assigned return values (code checks results) → closed-loop: `result = sys.create(...)`
-- DO NOT translate: logging, metrics, error handling, retries, caching, transaction management → these go into Archetype-typed Ascriptions
-- Available globals: `on`, `sys`, `now`, `uuid7`, `fullmatch`, `search`
+- DO NOT translate: logging, metrics, error handling, retries, caching, transaction management → these go into Qualifiers
+- Available globals: `on`, `sys`, `now`, `uuid4`, `fullmatch`, `search`
 
 ### Legal/Regulatory Domain (Legislation Adapter)
 
 Source: published legislation and regulatory texts (GDPR, NIS2, DORA, etc.).
 
-The sourced System represents the **legal entity itself** (the regulation as a System). Its DNA encodes the regulatory requirements that governed Systems must satisfy.
+The sourced System represents the **legal entity itself** (the regulation as a System). Its DPR encodes the regulatory requirements that governed Systems must satisfy.
 
-> **⚠️ STALE**: Constitution/Organization layers are eliminated in current GSM. Concepts map to: Purpose → Structure.purpose, Directive → Directive, Policy → Norm, Rule → Mechanism rule, Operationalization → eliminated.
-
-**Former Constitution layer:**
-
+**Constitution layer:**
 - Purpose (the regulation's objectives — e.g., "Protection of personal data", "Cybersecurity resilience")
 - Directive (normative requirements — e.g., "System MUST ENSURE lawfulness OF personal-data-processing")
 
 **Organization layer:**
-
-- Norm (measurable obligations derived from articles — e.g., data breach notification within 72 hours)
-- Mechanism rule (operational procedures mandated by articles — e.g., data subject access request handling)
+- Policy (measurable obligations derived from articles — e.g., data breach notification within 72 hours)
+- Rule (operational procedures mandated by articles — e.g., data subject access request handling)
 - Function (capabilities the regulation requires — e.g., "Data breach notification", "Impact assessment")
-- DNA chain (Directive → Norm → Mechanism rule chains tracing regulatory lineage)
+- Operationalization (Directive → Policy → Rule chains tracing regulatory lineage)
 
 **SaaS deployment model:**
-
 - Regulatory Systems are defined once in SaaS SIE instances
-- Tenant Systems are governed by regulatory Systems via Directives targeting tenant Structure purposes
-- Governance processes propagate regulatory DNA as constraints on tenant Systems
-- Tenant compliance is evaluated by the Supervision plane against regulatory DNA
+- Tenant Systems establish Relationships (`GOVERNED_SUBJECT ↔ LEGISLATOR`) to regulatory Systems
+- Governance processes propagate regulatory DPR as constraints on tenant Systems
+- Tenant compliance is evaluated by the Supervision plane against regulatory DPR
 
 ### Standards Domain (Standards Adapter)
 
 Source: published standards and norms (ISO 27001, ISO 9001, NIST CSF, CIS Benchmarks, etc.).
 
 Similar to legal/regulatory, but with:
-
 - Purpose (the standard's objectives)
 - Directive (normative requirements from SHALL/SHOULD clauses)
-- Norm (measurable controls — e.g., "Access control review frequency ≤ 90 days")
+- Policy (measurable controls — e.g., "Access control review frequency ≤ 90 days")
 - Function (control activities — e.g., "Access review", "Vulnerability scanning")
-- DNA chain (requirement → control → procedure chains)
+- Operationalization (requirement → control → procedure chains)
 
-Standards Systems govern tenant Systems via Directives (same pattern as Legal/Regulatory governance).
+Standards Systems use Relationship roles: `STANDARDIZATION_BODY ↔ GOVERNED_SUBJECT` or `CERTIFYING_AUTHORITY ↔ GOVERNED_SUBJECT`.
 
 ## Idempotency & Incremental Sync
 
@@ -368,7 +353,7 @@ Standards Systems govern tenant Systems via Directives (same pattern as Legal/Re
 | Risk | Mitigation |
 |---|---|
 | **Translation fidelity** | LLM self-verification loop (Phase 3): verify each primitive against source, max 3 iterations |
-| **Hallucinated primitives** | Phase 6 validates: every Archetype referenced in Mechanism rules MUST be defined in output |
+| **Hallucinated primitives** | Phase 6 validates: every archetype referenced in Rules MUST be defined in output |
 | **Naming drift across runs** | Deterministic naming rules per adapter + deterministic IDs (UUID5) |
 | **Confidence visibility** | Every LLM-extracted primitive has `confidence` score + `coherenceVerified` flag |
 | **Human trust boundary** | All output has `definitionStatus: DRAFT` — nothing is ACTIVE without governance review |
@@ -380,45 +365,44 @@ Standards Systems govern tenant Systems via Directives (same pattern as Legal/Re
 
 Two GSM changes are prerequisites for the Definition Sourcer:
 
-### 1. Structure self-containment (STALE)
+### 1. Component self-containment
 
 ```plantuml
-Structure "1" *--> "0..*" Structure : contains
+Component "1" *--> "0..*" Component : contains
 ```
 
-Structural hierarchy within Structures (repo → module → package). This is first-order structural containment — not governance composition (which remains a System-level decision). Contained sub-Structures inherit their parent Structure's governance scope.
+Structural hierarchy within Components (repo → module → package). This is first-order structural containment — not governance composition (which remains a System-level decision). Contained sub-Components inherit their parent's System ownership and all four composition conditions.
 
 ### 2. Definition supersession
 
 ```plantuml
-Ascription "0..1" o--> "0..1" Ascription : supersedes
+SystemicPrimitive "0..1" o--> "0..1" SystemicPrimitive : supersedes
 ```
 
 Optional reference from a new definition to the one it replaces. Constraints:
-
-- Same Ascription subtype (Mechanism can only supersede Mechanism)
+- Same primitive type (Rule can only supersede Rule)
 - Same owning System
 - No circular chains
 - When superseding primitive reaches ACTIVE, superseded automatically transitions to DEPRECATED
 
 This handles incremental sync (code changed → new DRAFT supersedes existing ACTIVE) and applies universally beyond the Sourcer (any definition evolution scenario).
 
-## Technical Archetype Schemas (IT Domain Preset)
+## Technical Qualifier Schemas (IT Domain Preset)
 
-Cross-cutting technical concerns extracted from code annotations, configuration, and framework conventions (expressed as domain Archetype schemas extending GSM base archetypes via allOf):
+Cross-cutting technical concerns extracted from code annotations, configuration, and framework conventions:
 
-| Archetype Schema | Applicable to | Schema captures |
+| Qualifier Schema | Applicable to | Schema captures |
 |---|---|---|
-| `ErrorHandling` | Mechanism | strategy, maxRetries, backoffPolicy, fallbackAction |
-| `RetryPolicy` | Mechanism, Interaction | maxAttempts, backoffType, initialDelay, maxDelay |
-| `CachingPolicy` | Mechanism | strategy, ttl, evictionPolicy, keyPattern |
-| `LoggingPolicy` | Mechanism | level, structured, sensitiveFields, auditRequired |
-| `TimeoutPolicy` | Interaction, Mechanism | connectTimeout, readTimeout, writeTimeout |
-| `CircuitBreaker` | Interaction | failureThreshold, resetTimeout, halfOpenRequests |
+| `ErrorHandling` | Rule, Function, Mechanism | strategy, maxRetries, backoffPolicy, fallbackAction |
+| `RetryPolicy` | Rule, Mechanism, Interaction | maxAttempts, backoffType, initialDelay, maxDelay |
+| `CachingPolicy` | Function, Mechanism | strategy, ttl, evictionPolicy, keyPattern |
+| `LoggingPolicy` | Rule, Function, Mechanism | level, structured, sensitiveFields, auditRequired |
+| `TimeoutPolicy` | Interaction, Channel, Mechanism | connectTimeout, readTimeout, writeTimeout |
+| `CircuitBreaker` | Interaction, Channel | failureThreshold, resetTimeout, halfOpenRequests |
 | `RateLimiting` | Receptor, Interface | requestsPerSecond, burstSize, strategy |
-| `TransactionScope` | Mechanism | isolation, propagation, readOnly |
-| `SecurityContext` | Interface, Receptor | authRequired, authMechanism, encryption, mTLS |
-| `Observability` | Mechanism | tracingEnabled, metricsEnabled, spanName, customAttributes |
+| `TransactionScope` | Rule, Function | isolation, propagation, readOnly |
+| `SecurityContext` | Interface, Channel, Receptor | authRequired, authMechanism, encryption, mTLS |
+| `Observability` | Mechanism, Function | tracingEnabled, metricsEnabled, spanName, customAttributes |
 
 ## UI Integration
 
@@ -442,7 +426,7 @@ sie/sie-definition-sourcer/
 ├── README.md                  # This file
 ├── LICENSE
 └── definition/                # Design-time artifacts
-    ├── architecture/          # Architecture and sequence diagrams
+    ├── architecture/          # Component and sequence diagrams
     ├── adapters/              # Source adapter specifications
     │   ├── git-repository/    # IT domain: Git Repository Adapter
     │   ├── legislation/       # Legal domain: Legislation Adapter
@@ -450,6 +434,6 @@ sie/sie-definition-sourcer/
     ├── schemas/               # JSON schemas
     │   ├── output/            # Output document schema
     │   ├── provenance/        # Provenance model schema
-    │   └── qualifiers/        # Technical Archetype schemas
+    │   └── qualifiers/        # Technical qualifier archetype schemas
     └── pipeline/              # Generic pipeline specifications
 ```
