@@ -34,6 +34,7 @@ Source Adapters are organized into **domain presets** — curated collections of
 - LLM prompt specializations for the domain
 
 Examples:
+
 - **IT domain preset**: Git Repository Adapter (code → Infrastructure + Organization), Helm Chart Adapter, OpenAPI Adapter, etc.
 - **Legal/Regulatory domain preset**: Legislation Adapter (legal texts → Constitution + Organization), Standards Adapter (ISO/IEC norms → DPR)
 - Future presets: Financial, Healthcare, Industrial, etc.
@@ -44,7 +45,7 @@ Legal/regulatory sources (GDPR, NIS2, ISO 27001, etc.) produce GSM definitions f
 
 A tenant's Systems are **governed subjects** of these legal entity Systems. The governance relationship is:
 
-```
+```text
 LegalEntitySystem (GDPR)  ←→  TenantSystem (CustomerApp)
   Role: LEGISLATOR              Role: GOVERNED_SUBJECT
   Relationship: governance mandate
@@ -56,7 +57,7 @@ The tenant's SIE instance sources the legal entity System's DPR through Relation
 
 ### Generic Pipeline (source-agnostic)
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
 │  DEFINITION SOURCER — Generic Pipeline                  │
 │                                                         │
@@ -92,7 +93,7 @@ The tenant's SIE instance sources the legal entity System's DPR through Relation
 The adapter connects to the source and produces a **classified artifact manifest**.
 
 | Responsibility | Owner |
-|---|---|
+| --- | --- |
 | Connect to source (clone, fetch, download) | Source Adapter |
 | Walk artifact tree | Source Adapter |
 | Classify each artifact by structural role | Source Adapter (domain-specific classification table) |
@@ -105,11 +106,13 @@ Output: classified artifact manifest + structural skeleton.
 Two extraction modes, applied per artifact:
 
 **Deterministic extraction** (parsers — preferred when available):
+
 - Structured artifacts with known schemas (OpenAPI, protobuf, SQL DDL, JSON Schema, AsyncAPI, legal article databases with structured fields)
 - Source Adapter provides the parser
 - Output tagged with `extractionMethod: "parser-deterministic"`
 
 **LLM extraction** (when no deterministic parser exists):
+
 - Semi-structured or unstructured artifacts (source code, legal prose, standard narrative text)
 - Generic pipeline manages the LLM call with structured JSON output
 - Source Adapter provides the **prompt specialization** (classification table, naming rules, domain-specific extraction instructions)
@@ -177,7 +180,7 @@ All primitives carry `definitionStatus: DRAFT`. Nothing is activated without gov
 
 Every Source Adapter implements the following contract:
 
-```
+```text
 SourceAdapter
 ├── getSourceType(): string
 │   Returns a unique identifier for this source type
@@ -255,30 +258,34 @@ The `sourceType` and `schemaSourceType` fields enable filtering and trust differ
 
 Source: code repositories.
 
-**Infrastructure layer:**
+#### Infrastructure layer
+
 - Component (composite: repo → modules → packages)
 - Mechanism, Receptor, Effector
 - Interface, Interaction, Channel
 - EventArchetype + Schema
 - StateObjectArchetype + Schema
 
-**Organization layer:**
+#### Organization layer
+
 - Rule (Starlark body translated from method logic — priority target)
 - Function (from public methods/operations)
 
-**Auto-derived by Definition Manager (NOT by Sourcer):**
+#### Auto-derived by Definition Manager (NOT by Sourcer)
+
 - Controller, Actuator, Sensor (from Rule bodies)
 - Actuation, Sensing
 
-**Technical qualifier archetypes extracted from code:**
+#### Technical qualifier archetypes extracted from code
+
 - ErrorHandling, RetryPolicy, CachingPolicy, LoggingPolicy
 - TimeoutPolicy, CircuitBreaker, RateLimiting
 - TransactionScope, SecurityContext, Observability
 
-**Class-to-GSM classification table (IT/Git):**
+#### Class-to-GSM classification table (IT/Git)
 
 | Code pattern | Discriminant | GSM primitive |
-|---|---|---|
+| --- | --- | --- |
 | Service/handler class | Methods that receive input AND mutate state or produce events | **sub-Component** + methods → **Rules** |
 | Controller/endpoint class | Annotated endpoints (@RestController, @GrpcService, etc.) | **sub-Component** + endpoints → **Receptors** + methods → **Rules** |
 | Entity/model class | Persistent fields (@Entity, ORM model, Prisma model) | **StateObjectArchetype** + fields → **Schema** |
@@ -290,11 +297,13 @@ Source: code repositories.
 | Listener/consumer class | Consumes events/messages (Kafka, RabbitMQ, SQS) | **Receptors** + methods → **Rules** |
 
 **Method-to-Rule filter** (only behaviorally meaningful methods):
+
 - Receives an event/request/message (trigger)
 - Mutates state OR produces an event/response (effect)
 - Skip: getters, setters, toString, equals, hashCode, builders, pure formatters
 
-**Starlark translation contract:**
+#### Starlark translation contract
+
 - Method input (HTTP request, event payload) → `event = on("EventArchetypeName")`
 - DB/cache reads → `var = sys.acquire("ArchetypeName", filter)`
 - DB writes → `sys.create/modify/delete("ArchetypeName", data)`
@@ -309,17 +318,20 @@ Source: published legislation and regulatory texts (GDPR, NIS2, DORA, etc.).
 
 The sourced System represents the **legal entity itself** (the regulation as a System). Its DPR encodes the regulatory requirements that governed Systems must satisfy.
 
-**Constitution layer:**
+#### Constitution layer
+
 - Purpose (the regulation's objectives — e.g., "Protection of personal data", "Cybersecurity resilience")
 - Directive (normative requirements — e.g., "System MUST ENSURE lawfulness OF personal-data-processing")
 
-**Organization layer:**
+#### Organization layer
+
 - Policy (measurable obligations derived from articles — e.g., data breach notification within 72 hours)
 - Rule (operational procedures mandated by articles — e.g., data subject access request handling)
 - Function (capabilities the regulation requires — e.g., "Data breach notification", "Impact assessment")
 - Operationalization (Directive → Policy → Rule chains tracing regulatory lineage)
 
-**SaaS deployment model:**
+#### SaaS deployment model
+
 - Regulatory Systems are defined once in SaaS SIE instances
 - Tenant Systems establish Relationships (`GOVERNED_SUBJECT ↔ LEGISLATOR`) to regulatory Systems
 - Governance processes propagate regulatory DPR as constraints on tenant Systems
@@ -330,6 +342,7 @@ The sourced System represents the **legal entity itself** (the regulation as a S
 Source: published standards and norms (ISO 27001, ISO 9001, NIST CSF, CIS Benchmarks, etc.).
 
 Similar to legal/regulatory, but with:
+
 - Purpose (the standard's objectives)
 - Directive (normative requirements from SHALL/SHOULD clauses)
 - Policy (measurable controls — e.g., "Access control review frequency ≤ 90 days")
@@ -341,7 +354,7 @@ Standards Systems use Relationship roles: `STANDARDIZATION_BODY ↔ GOVERNED_SUB
 ## Idempotency & Incremental Sync
 
 | Concern | Design |
-|---|---|
+| --- | --- |
 | **Deterministic ID** | `UUID5(systemId, primitiveType, primitiveName)` — survives re-extraction if name is stable |
 | **Idempotency** | Same source + same version → same output. LLM calls: `temperature: 0`, `seed: 42`. Parser phases: deterministic |
 | **Incremental** | Only re-extract changed artifacts (git diff, document version diff). Unchanged artifacts: skip. Changed: full re-extract → supersession detection |
@@ -351,7 +364,7 @@ Standards Systems use Relationship roles: `STANDARDIZATION_BODY ↔ GOVERNED_SUB
 ## Risk Mitigation
 
 | Risk | Mitigation |
-|---|---|
+| --- | --- |
 | **Translation fidelity** | LLM self-verification loop (Phase 3): verify each primitive against source, max 3 iterations |
 | **Hallucinated primitives** | Phase 6 validates: every archetype referenced in Rules MUST be defined in output |
 | **Naming drift across runs** | Deterministic naming rules per adapter + deterministic IDs (UUID5) |
@@ -380,6 +393,7 @@ SystemicPrimitive "0..1" o--> "0..1" SystemicPrimitive : supersedes
 ```
 
 Optional reference from a new definition to the one it replaces. Constraints:
+
 - Same primitive type (Rule can only supersede Rule)
 - Same owning System
 - No circular chains
@@ -392,7 +406,7 @@ This handles incremental sync (code changed → new DRAFT supersedes existing AC
 Cross-cutting technical concerns extracted from code annotations, configuration, and framework conventions:
 
 | Qualifier Schema | Applicable to | Schema captures |
-|---|---|---|
+| --- | --- | --- |
 | `ErrorHandling` | Rule, Function, Mechanism | strategy, maxRetries, backoffPolicy, fallbackAction |
 | `RetryPolicy` | Rule, Mechanism, Interaction | maxAttempts, backoffType, initialDelay, maxDelay |
 | `CachingPolicy` | Function, Mechanism | strategy, ttl, evictionPolicy, keyPattern |
@@ -409,7 +423,7 @@ Cross-cutting technical concerns extracted from code annotations, configuration,
 The Definition Sourcer is triggerable from the ITIP UI (and future domain app UIs):
 
 | UI Element | Behavior |
-|---|---|
+| --- | --- |
 | **Trigger location** | System detail view → "Source Definitions" action |
 | **Source selection** | Choose source type (domain preset) → adapter-specific form |
 | **Configuration** | Adapter-specific: repo URL + branch (git), document reference (legislation), etc. |
@@ -421,7 +435,7 @@ The Definition Sourcer is triggerable from the ITIP UI (and future domain app UI
 
 ## Repository Structure
 
-```
+```text
 sie/sie-definition-sourcer/
 ├── README.md                  # This file
 ├── LICENSE
