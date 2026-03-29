@@ -1,20 +1,20 @@
-# SIE Definition Sourcer
+# GSM Sourcer
 
-The **Definition Sourcer** is a SIE component that sources GSM (Generative System Model) definitions from external artifacts — code repositories, published standards, regulatory texts, or any other definitional artifact repository.
+The **GSM Sourcer** is a SIE component that sources GSM (Generative System Model) definitions from external artifacts — code repositories, published standards, regulatory texts, or any other definitional artifact repository.
 
-External artifacts are **definitions in their native form**. Code defines structure and behavior. Legislation defines principles, constraints, and obligations. Standards define quality requirements and compliance boundaries. The Definition Sourcer translates these native definitions into GSM primitives, closing the gap between the world's definitions and SIE's generative model.
+External artifacts are **definitions in their native form**. Code defines structure and behavior. Legislation defines principles, constraints, and obligations. Standards define quality requirements and compliance boundaries. The GSM Sourcer translates these native definitions into GSM primitives, closing the gap between the world's definitions and SIE's generative model.
 
 ## Design Directives
 
 ### "Source artifacts ARE definitions"
 
-The Definition Sourcer does not *interpret* or *describe* external artifacts — it **translates** them. A Java service class IS a Component with Mechanisms. An ISO norm article IS a Directive. A GDPR obligation IS a Policy. The sourcer performs a faithful structural translation from the source's native definitional language into GSM's universal definitional language.
+The GSM Sourcer does not *interpret* or *describe* external artifacts — it **translates** them. A Java service class IS a Component with Mechanisms. An ISO norm article IS a Directive. A GDPR obligation IS a Policy. The sourcer performs a faithful structural translation from the source's native definitional language into GSM's universal definitional language.
 
-This is distinct from Description-plane observation (DSM). DSM observes runtime state and behavior. The Definition Sourcer operates entirely within the Definition plane: it takes definitional artifacts as input and produces definitional primitives as output.
+This is distinct from Description-plane observation (DSM). DSM observes runtime state and behavior. The GSM Sourcer operates entirely within the Definition plane: it takes definitional artifacts as input and produces definitional primitives as output.
 
 ### Generic core, domain-specific source adapters
 
-The Definition Sourcer is **source-agnostic at its core**. The pipeline (inventory → extract → verify → merge → validate → output) is universal. What varies is the **Source Adapter** — a domain-specific module that:
+The GSM Sourcer is **source-agnostic at its core**. The pipeline (inventory → extract → verify → merge → validate → output) is universal. What varies is the **Source Adapter** — a domain-specific module that:
 
 - Connects to a specific artifact repository type (git, legislation database, standards registry, artifact repository)
 - Classifies artifacts within that source
@@ -51,7 +51,7 @@ LegalEntitySystem (GDPR)  ←→  TenantSystem (CustomerApp)
   Relationship: governance mandate
 ```
 
-The tenant's SIE instance sources the legal entity System's DPR through Relationship-based governance inheritance. The Definition Sourcer populates the upstream legal entity Systems; governance processes propagate constraints downstream.
+The tenant's SIE instance sources the legal entity System's DPR through Relationship-based governance inheritance. The GSM Sourcer populates the upstream legal entity Systems; governance processes propagate constraints downstream.
 
 ## Architecture
 
@@ -59,7 +59,7 @@ The tenant's SIE instance sources the legal entity System's DPR through Relation
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│  DEFINITION SOURCER — Generic Pipeline                  │
+│  GSM SOURCER — Generic Pipeline                         │
 │                                                         │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐  │
 │  │ INVENTORY│→ │ EXTRACT  │→ │ VERIFY   │→ │ MERGE  │  │
@@ -172,7 +172,7 @@ Output: findings array (ERROR, WARNING, INFO).
 
 #### Phase 7: OUTPUT
 
-A single JSON document conforming to the Definition Sourcer output schema (see Output Schema section), ready for persistence via the Definition Manager API.
+A single JSON document conforming to the GSM Sourcer output schema (see Output Schema section), ready for persistence via the Definition Manager API.
 
 All primitives carry `definitionStatus: DRAFT`. Nothing is activated without governance review.
 
@@ -376,7 +376,7 @@ Standards Systems use Relationship roles: `STANDARDIZATION_BODY ↔ GOVERNED_SUB
 
 ## GSM Prerequisites
 
-Two GSM changes are prerequisites for the Definition Sourcer:
+Two GSM changes are prerequisites for the GSM Sourcer:
 
 ### 1. Component self-containment
 
@@ -420,7 +420,7 @@ Cross-cutting technical concerns extracted from code annotations, configuration,
 
 ## UI Integration
 
-The Definition Sourcer is triggerable from the ITIP UI (and future domain app UIs):
+The GSM Sourcer is triggerable from the ITIP UI (and future domain app UIs):
 
 | UI Element | Behavior |
 | --- | --- |
@@ -436,7 +436,7 @@ The Definition Sourcer is triggerable from the ITIP UI (and future domain app UI
 ## Repository Structure
 
 ```text
-sie/sie-definition-sourcer/
+gsm-sourcer/
 ├── README.md                  # This file
 ├── LICENSE
 └── definition/                # Design-time artifacts
