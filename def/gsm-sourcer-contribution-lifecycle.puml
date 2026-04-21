@@ -1,0 +1,134 @@
+@startuml gsm-sourcer-contribution-lifecycle
+
+' ============================================================
+' VISUAL THEME
+' ============================================================
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 12
+skinparam ArrowColor #57606A
+skinparam DefaultFontName "SansSerif"
+skinparam backgroundColor #FFFFFF
+
+skinparam state {
+  BackgroundColor #FFFFFF
+  BorderColor #57606A
+  FontColor #24292F
+}
+skinparam noteBackgroundColor #FFF8C5
+skinparam noteBorderColor #57606A
+
+title GSM Sourcer - Contribution & SubjectIdentity lifecycle
+
+note as Legend
+  Two intertwined lifecycles:
+  (1) **Contribution lifecycle** — every Contribution on every panel
+      goes through Posted -> Considered -> (Winning | Superseded | Diagnosed).
+  (2) **SubjectIdentity lifecycle** — a SubjectIdentity exists once
+      its panel has at least one accepted Contribution; "convergence"
+      is reached when no panel for it gains new Contributions and
+      Validation passes.
+end note
+
+note as N_Contrib
+  ============================
+  CONTRIBUTION LIFECYCLE
+  ============================
+end note
+
+[*] --> Posted : KS calls\nblackboard.post(panel, value)
+
+state Posted {
+  Posted : Engine attaches contributorKsId,\nderivedFrom, createdAt.
+  Posted : cacheKey validated when\ndeterminism = NON_DETERMINISTIC.
+}
+
+Posted --> Considered : enters resolver pool\nfor (panel, identity, slot)
+
+state Considered {
+  Considered : ContributionResolver evaluates\nall current contributions.
+}
+
+Considered --> Winning : selected by resolver
+Considered --> Losing : not selected\n(still kept for audit)
+Considered --> Conflicted : resolver = failOnConflict\nand multiple contributions
+Considered --> EscalatedToCheckpoint : resolver = userMediated\nand multiple contributions
+
+Winning --> Superseded : new Contribution wins\nor user override
+Winning --> [*] : Run ends with this winning
+
+Losing --> Considered : new Contribution arrives\n-> resolver re-evaluates
+Conflicted --> EscalatedToCheckpoint : Control routes to\nCheckpoint-A
+EscalatedToCheckpoint --> Winning : user picks one\n(or appends override\nas a new Contribution)
+EscalatedToCheckpoint --> Superseded : user drops this contribution
+
+Posted --> Diagnosed : engine validation rejects\n(e.g. cacheKey missing)
+Diagnosed --> [*]
+
+note as N_SI
+  ============================
+  SUBJECTIDENTITY LIFECYCLE
+  ============================
+end note
+
+state "SubjectIdentity lifecycle" as SI {
+
+  [*] --> NotYetIdentified
+
+  state "Identified\n(>= 1 SubjectIdentity contribution)" as Identified
+  NotYetIdentified --> Identified : IdentificationKS\nposts SubjectIdentity\nfor identityKey K
+  Identified --> Identified : ReconciliationKS posts\nadditional / merging\nSubjectIdentity contributions
+
+  state "PanelsAccreting\n(other panels gain Contributions:\nArchetyping / Statement / Granularity /\nEvidence / Confidence)" as PanelsAccreting
+  Identified --> PanelsAccreting : trigger predicates fire\nover Blackboard state
+
+  state "Quiescent\n(no new Contributions for\nN consecutive Control iterations)" as Quiescent
+  PanelsAccreting --> Quiescent : Control convergence\ndetector
+
+  state "AwaitingCheckpointA" as CA
+  Quiescent --> CA : if checkpoints.A\nenabled
+  Quiescent --> ReadyForPipeline : if checkpoints.A\ndisabled
+
+  state CA {
+    state "Reviewing" as CA_Review
+    state "Approved" as CA_Approved
+    state "Override applied" as CA_Override
+    state "Rejected" as CA_Rejected
+    CA_Review --> CA_Approved : user: approve
+    CA_Review --> CA_Override : user: append\nuser-mediated\nContribution
+    CA_Review --> CA_Rejected : user: drop identity
+  }
+
+  CA_Approved --> ReadyForPipeline
+  CA_Override --> PanelsAccreting : Control re-fires\ntriggers (cascade)
+  CA_Rejected --> Dropped
+
+  state Dropped <<end>>
+  state ReadyForPipeline
+
+  ReadyForPipeline --> Validating : Pipeline picks up\nresolved tuple
+
+  state Validating
+  Validating --> AwaitingCheckpointB : OK
+  Validating --> PanelsAccreting : failed\n-> diagnostic + re-fire
+
+  state AwaitingCheckpointB
+  AwaitingCheckpointB --> Registering : approved
+  AwaitingCheckpointB --> PanelsAccreting : override\n(cascade)
+  AwaitingCheckpointB --> Dropped : rejected
+
+  state Registering
+  Registering --> [*] : DefMan DRAFT registered
+}
+
+note right of CA
+  Checkpoints A and B are GOVERNANCE OVERLAYS,
+  not part of the canonical Blackboard. They suspend
+  the Run for user mediation. Override = append a new
+  Contribution (with confidence = 1.0, contributorKsId
+  = user) that supersedes the prior winner. Override-
+  cascade: Control invalidates dependent resolved
+  values across panels and re-fires triggers.
+end note
+
+@enduml

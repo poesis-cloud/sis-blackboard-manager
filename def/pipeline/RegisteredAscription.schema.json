@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/pipeline/RegisteredAscription/v1",
+  "title": "RegisteredAscription",
+  "description": "Engine-internal Pipeline record produced by the Registration stage after Checkpoint-B approval. Pairs a ValidatedAscriptionDraft with the DefMan AscriptionUri.",
+  "type": "object",
+  "required": [
+    "id",
+    "validatedDraftId",
+    "ascriptionUri",
+    "registrationStatus",
+    "registeredAt"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "validatedDraftId": {
+      "type": "string"
+    },
+    "ascriptionUri": {
+      "type": "string",
+      "description": "DefMan-issued versioned URI of the DRAFT Ascription."
+    },
+    "registrationStatus": {
+      "type": "string",
+      "enum": [
+        "REGISTERED",
+        "FAILED",
+        "SKIPPED"
+      ],
+      "description": "SKIPPED is used when Granularity verdict was `drop`."
+    },
+    "registrationDiagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "../types/Diagnostic.schema.json"
+      }
+    },
+    "registeredAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}

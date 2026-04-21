@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/panels/Contribution/v1",
+  "title": "Contribution",
+  "description": "A typed value posted by a Knowledge Source onto a panel of the Blackboard. Multiple Contributions on the same (panel, subjectIdentityId, slot) coexist; Control resolves the effective value at read time using the configured ContributionResolver.",
+  "type": "object",
+  "required": ["id", "panel", "subjectIdentityId", "slot", "value", "contributorKsId", "determinism", "createdAt"],
+  "properties": {
+    "id": { "type": "string" },
+    "panel": {
+      "type": "string",
+      "enum": ["SourceInterpretation", "SubjectIdentity", "Archetyping", "Statement", "Granularity", "Evidence", "Confidence"]
+    },
+    "subjectIdentityId": {
+      "type": "string",
+      "description": "Reference to the SubjectIdentity contribution this contribution is about. Null only on SourceInterpretation contributions (which precede subject identification)."
+    },
+    "slot": {
+      "type": "string",
+      "description": "Panel-specific slot name (e.g. 'archetypeRefs', 'statement', 'verdict', 'evidenceItem', 'score'). See per-panel schemas."
+    },
+    "value": {
+      "description": "Panel-specific value, validated against the panel schema for `slot`."
+    },
+    "contributorKsId": {
+      "type": "string",
+      "format": "uri",
+      "description": "Versioned gsmarc:// URI of the Knowledge Source that posted this contribution. May be 'gsmarc://gsm-sourcer/user/v1' for user-mediated overrides."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Self-declared confidence; used by the highestConfidence resolver. Optional. User-mediated contributions implicitly = 1.0."
+    },
+    "rationale": { "type": "string" },
+    "determinism": { "type": "string", "enum": ["DETERMINISTIC", "NON_DETERMINISTIC"] },
+    "cacheKey": {
+      "type": "string",
+      "description": "MANDATORY when determinism = NON_DETERMINISTIC. Used by the InferenceService cache and by re-derivation replay."
+    },
+    "derivedFrom": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Engine-managed lineage: contribution ids and SourceInterpretation ids the contributor read."
+    },
+    "supersedes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional: ids of prior Contributions on the same (panel, subjectIdentityId, slot) that this one explicitly supersedes (e.g. user override). Engine still keeps the superseded contributions for audit; resolver excludes them."
+    },
+    "diagnostics": { "type": "array", "items": { "$ref": "gsmarc://gsm-sourcer/types/Diagnostic/v1" } },
+    "createdAt": { "type": "string", "format": "date-time" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "determinism": { "const": "NON_DETERMINISTIC" } } },
+      "then": { "required": ["cacheKey"] }
+    }
+  ],
+  "additionalProperties": false
+}

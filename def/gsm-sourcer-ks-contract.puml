@@ -26,51 +26,64 @@ frame "CD - GSM Sourcer - Knowledge Source contract" {
   note as ContractNote
     **Knowledge Source (KS)** = a Java JAR shipped inside a Sourcing Pack.
 
-    A KS contributes to one or more Hypothesis slots on the Blackboard.
-    KSs NEVER:
-    - reference other KSs directly
-    - call DefMan, LLM providers, network, or filesystem outside ControlContext
-    - mutate posted hypotheses (post-only, monotonic)
+    A KS posts Contributions to ONE Blackboard panel.
 
-    KSs declare metadata in a `KnowledgeSourceDescriptor` so Control can
-    plan without invoking them.
+    **Canonical Blackboard rules enforced by the engine:**
+    - KSs are unaware of each other. There is NO `dependsOn` between
+      KSs. Ordering is expressed exclusively through `triggerPredicate`
+      over Blackboard state.
+    - KSs NEVER call DefMan, LLM providers, network or filesystem
+      outside `ControlContext`.
+    - KSs NEVER mutate posted Contributions (append-only).
+    - The Pipeline (Validation, Registration) is engine-only; no KS
+      contributes to it.
 
     **Validation Rules:**
     - `id` MUST be a versioned `gsmarc://` URI (no implicit "latest").
-    - `writesLevel` MUST be in `{L0, L1}` (L2/L3 are engine-only).
-    - For every read level r in `readsLevels`: r <= writesLevel
-      (with the convention SourceContext < L0).
+    - `writesPanel` MUST be one panel.
+    - For every read panel r in `readsPanels`: dependency is on
+      Blackboard STATE, not on a specific KS.
     - Trigger predicate language is restricted to read-only structural
-      checks (field-presence, set-contains, equality) — no side effects,
-      no method calls.
-    - Sandboxing: classloader-scoped network egress denied; only
-      `ControlContext` services may call out.
+      checks. No side effects, no method calls.
   end note
 
   package "Knowledge Source" {
 
     interface KnowledgeSource {
       +descriptor() : KnowledgeSourceDescriptor
-      +contribute(trigger : Hypothesis, view : BlackboardView, ctx : ControlContext) : Contribution
+      +contribute(trigger : Trigger, view : BlackboardView, ctx : ControlContext) : List<Contribution>
     }
 
     class KnowledgeSourceDescriptor <<descriptor>> {
       +id : KnowledgeSourceId
       +family : KnowledgeSourceFamily
-      +readsLevels : Set<Level>
-      +writesLevel : Level
+      +writesPanel : Panel
       +writesSlots : Set<SlotName>
+      +readsPanels : Set<Panel>
       +triggerPredicate : TriggerPredicate
-      +dependsOn : Set<KnowledgeSourceId>
+      +appliesToInterpretationKinds : Set<InterpretationKind>
       +parallelSafe : Boolean
+      +determinismDefault : Determinism
+      +resolverHint : ContributionResolver?
       +defmanExplorationNeeded : Boolean
       +defmanReadScope : Set<ArchetypeUri>
       +inferenceServiceNeeded : Boolean
       +budget : ResourceBudget
     }
+    note right of KnowledgeSourceDescriptor
+      **No `dependsOn`.** Coupling between KSs is forbidden.
+      A KS that needs another KS's output reads the resulting
+      Blackboard state via `triggerPredicate` and `readsPanels`.
+
+      `resolverHint` is advisory. Effective resolver per panel:
+        RunConfig.contributionResolvers[panel] (override)
+        > KS.resolverHint
+        > engine default for that panel
+    end note
 
     enum KnowledgeSourceFamily {
       DiscoveryKS
+      IdentificationKS
       ArchetypingKS
       StatementShapingKS
       ReconciliationKS
@@ -79,53 +92,58 @@ frame "CD - GSM Sourcer - Knowledge Source contract" {
       ConfidenceSynthesisKS
     }
 
-    enum Level {
-      L0
-      L1
-      L2
-      L3
+    enum Panel {
+      SourceInterpretation
+      SubjectIdentity
+      Archetyping
+      Statement
+      Granularity
+      Evidence
+      Confidence
     }
 
     class TriggerPredicate <<DSL>> {
       +expression : String
     }
     note right of TriggerPredicate
-      **Tiny declarative DSL** evaluated by Control.
-      Read-only, no side effects, no method calls.
+      **Tiny declarative DSL** evaluated by Control over Blackboard
+      state. Read-only, no side effects, no method calls.
 
       Grammar (informal):
         expr     := and | or | not | atom
-        atom     := levelEq | slotPresent | slotAbsent
-                  | setContains | equals
-        levelEq  := "level" "==" LevelLiteral
-        slotPresent  := SlotName "?"
-        slotAbsent   := "!" SlotName "?"
-        setContains  := SlotName ".contains(" Literal ")"
-        equals       := FieldPath "==" Literal
+        atom     := panelEq | resolvedPredicate | contributedByPredicate
+                  | interpretationKindIn | signalEquals | sizeCmp
+        panelEq            := "panel" "==" Panel
+        resolvedPredicate  := "resolved(" Panel ", identity )"
+                            | "!resolved(" Panel ", identity )"
+        contributedByPredicate := "contributedBy(self, identity )"
+                                | "!contributedBy(self, identity )"
+        interpretationKindIn := "kind in {" StringList "}"
 
       Examples:
-        level == L0
-        level == L1 && archetypeRefs? && !statement?
-        level == L1 && statement? && !granularityVerdict?
-        level == L1 && evidence.size > 0 && !confidence?
+        panel == SourceInterpretation
+        panel == SubjectIdentity && !resolved(Archetyping, identity)
+        panel == Archetyping && resolved(SubjectIdentity, identity)
+                              && !contributedBy(self, identity)
+        panel == Statement && resolved(Archetyping, identity)
+                            && !contributedBy(self, identity)
+        panel == Granularity && resolved(Statement, identity)
+        panel == Confidence && resolved(Statement, identity)
+                             && evidence(identity).size > 0
     end note
 
-    class Contribution {
-      +kind : enum { POST, SKIP, DIAGNOSE }
-      +hypotheses : List<Hypothesis>
-      +determinism : enum { DETERMINISTIC, NON_DETERMINISTIC }
-      +cacheKey : CacheKey?
-      +diagnostics : List<Diagnostic>
+    enum Determinism {
+      DETERMINISTIC
+      NON_DETERMINISTIC
     }
-    note right of Contribution
-      **Determinism is per-contribution, not per-KS.**
-      A KS may emit DETERMINISTIC contributions in some
-      cases and NON_DETERMINISTIC in others.
 
-      `cacheKey` is MANDATORY when determinism is
-      NON_DETERMINISTIC. Used by InferenceService cache
-      and by re-derivation replay.
-    end note
+    enum ContributionResolver {
+      highestConfidence
+      firstWriter
+      failOnConflict
+      userMediated
+      collectAll
+    }
 
     class ResourceBudget {
       +wallClockMs : Long
@@ -137,10 +155,11 @@ frame "CD - GSM Sourcer - Knowledge Source contract" {
 
     KnowledgeSource ..> KnowledgeSourceDescriptor
     KnowledgeSourceDescriptor *-- KnowledgeSourceFamily
-    KnowledgeSourceDescriptor *-- "1..*" Level : reads/writes
+    KnowledgeSourceDescriptor *-- Panel : writesPanel
+    KnowledgeSourceDescriptor *-- "0..*" Panel : readsPanels
     KnowledgeSourceDescriptor *-- TriggerPredicate
     KnowledgeSourceDescriptor *-- ResourceBudget
-    KnowledgeSource ..> Contribution : returns
+    KnowledgeSourceDescriptor o-- ContributionResolver : resolverHint
   }
 
   package "Engine surface (ControlContext)" {
@@ -160,41 +179,44 @@ frame "CD - GSM Sourcer - Knowledge Source contract" {
     note right of ControlContext
       **Single API surface a KS sees.** Anything not on
       this interface is unreachable from a KS classloader.
-
-      Egress and tenant scoping enforced inside services.
     end note
 
-    interface BlackboardView <<read-only>> {
-      +query(q : Query) : Stream<Hypothesis>
-      +get(id : HypothesisId) : Hypothesis?
-      +post(level : Level, h : Hypothesis) : HypothesisId
+    interface BlackboardView <<read-only for queries>> {
+      +query(q : Query) : Stream<Contribution>
+      +get(id : ContributionId) : Contribution?
+      +resolved(panel : Panel, subjectIdentityId : SubjectIdentityId) : PanelValue?
+      +contributionsOf(self : KnowledgeSourceId, identity : SubjectIdentityId) : Stream<Contribution>
+      +post(panel : Panel, value : PanelValue, opts : PostOptions) : ContributionId
     }
+    note right of BlackboardView
+      `resolved(...)` returns the Control-resolved value
+      (after running the configured ContributionResolver
+      over all current contributions).
+
+      `post(...)` is the only mutating operation.
+      Engine attaches `contributorKsId`, `derivedFrom`,
+      `createdAt`, and validates `cacheKey` presence
+      when determinism = NON_DETERMINISTIC.
+    end note
 
     interface DefManExplorationService <<read-only>> {
       +navigateFrom(root : AscriptionUri, follow : Set<RelType>, depth : Int) : ExplorationResult
       +searchByArchetype(a : ArchetypeUri, filter : Filter) : Page<AscriptionRef>
       +describeAscription(uri : AscriptionUri) : AscriptionView
     }
-    note right of DefManExplorationService
-      Read-only. Tenant-scoped by engine. Per-Run cache.
-      All responses captured in the BundleStore for replay.
-    end note
 
     interface InferenceService {
-      +completeStatement(c : CandidateAscriptionHypothesis) : InferenceResult
+      +completeStatement(targetIdentity : SubjectIdentityId) : InferenceResult
       +withTools(tools : Set<EngineTool>) : InferenceSession
       +withPromptTemplate(t : PromptTemplate) : InferenceSession
     }
     note right of InferenceService
-      Default prompt is engine-derived from candidate
-      (archetypeSchema + provenance excerpt + neighbours).
-
+      Default prompt is engine-derived from the resolved
+      Archetyping schema + supporting SourceInterpretations.
       A KS MAY override the prompt template.
-
-      A KS MAY register `EngineTool.DEFMAN_EXPLORATION`
-      so the LLM itself drives DefMan navigation via
-      function-calling. Engine still enforces tenant
-      scope and read-only.
+      A KS MAY register `EngineTool.DEFMAN_EXPLORATION` so
+      the LLM itself drives DefMan navigation via
+      function-calling.
     end note
 
     enum EngineTool {

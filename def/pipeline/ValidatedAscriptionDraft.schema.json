@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/pipeline/ValidatedAscriptionDraft/v1",
+  "title": "ValidatedAscriptionDraft",
+  "description": "Engine-internal Pipeline record. Produced by the Validation stage from a converged Blackboard tuple. NOT a Blackboard panel value. Carries an audit trail of resolver decisions.",
+  "type": "object",
+  "required": [
+    "id",
+    "subjectIdentityId",
+    "subjectKind",
+    "identityKey",
+    "archetypeRefs",
+    "statement",
+    "validationStatus",
+    "resolverDecisions",
+    "createdAt"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "subjectIdentityId": {
+      "type": "string",
+      "description": "Id of the winning SubjectIdentity Contribution."
+    },
+    "subjectKind": {
+      "type": "string",
+      "description": "GSM subject kind (Structure, Mechanism, Effector, Receptor, Interaction, Archetype, Directive, Norm)."
+    },
+    "identityKey": {
+      "type": "string"
+    },
+    "archetypeRefs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "Union of winning Archetyping contributions for this identity."
+    },
+    "statement": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Winning Statement value (validated against the resolved archetype JSON Schema)."
+    },
+    "granularityVerdict": {
+      "type": "string",
+      "enum": [
+        "keep",
+        "drop",
+        "splitInto",
+        "mergeWith"
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "validationStatus": {
+      "type": "string",
+      "enum": [
+        "OK",
+        "FAILED"
+      ]
+    },
+    "validationDiagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "../types/Diagnostic.schema.json"
+      }
+    },
+    "resolverDecisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "panel",
+          "selectedContributionId",
+          "resolver"
+        ],
+        "properties": {
+          "panel": {
+            "type": "string",
+            "enum": [
+              "SubjectIdentity",
+              "Archetyping",
+              "Statement",
+              "Granularity",
+              "Evidence",
+              "Confidence"
+            ]
+          },
+          "selectedContributionId": {
+            "type": "string"
+          },
+          "competingContributionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "resolver": {
+            "type": "string",
+            "enum": [
+              "highestConfidence",
+              "firstWriter",
+              "failOnConflict",
+              "userMediated",
+              "collectAll"
+            ]
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "evidenceContributionIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}

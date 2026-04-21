@@ -13,14 +13,11 @@ skinparam backgroundColor #FFFFFF
 skinparam packageStyle rectangle
 skinparam packageBackgroundColor #F6F8FA
 skinparam packageBorderColor #57606A
-
 skinparam componentBackgroundColor #FFFFFF
 skinparam componentBorderColor #57606A
 skinparam componentFontColor #24292F
-
 skinparam interfaceBackgroundColor #FFFFFF
 skinparam interfaceBorderColor #57606A
-
 skinparam noteBackgroundColor #FFF8C5
 skinparam noteBorderColor #57606A
 
@@ -31,12 +28,15 @@ frame "PD - GSM Sourcer - Component architecture" {
     Spring, OpenAPI, languages, build systems, or repositories
     inside Control or any engine utility.
 
-    All IT-domain knowledge is shipped in **Sourcing Packs**
-    (e.g. ITIP GSM Sourcing Pack). A Sourcing Pack contributes
-    Knowledge Sources (KSs) that load in their own classloader
-    with network egress denied.
+    All IT-domain knowledge lives in **Sourcing Packs** loaded in
+    sandboxed classloaders with network egress denied.
 
-    The only API surface a KS sees is `ControlContext`.
+    **Canonical Blackboard pattern:** Control schedules KSs based on
+    declarative trigger predicates over Blackboard state, then
+    resolves competing Contributions per panel using
+    ContributionResolver. The Pipeline (Validation -> Registration)
+    is a separate, engine-only stage that consumes the converged
+    Blackboard.
   end note
 
   package "GSM Sourcer engine" as Engine {
@@ -44,15 +44,10 @@ frame "PD - GSM Sourcer - Component architecture" {
     component "Run Control\n(REST API)" as RunControl
 
     component "Plug-in Resolver\n(R3 -> R3.5 -> R6)" as PackResolver
-    note right of PackResolver
-      **R3 (now)**: RunRequest carries explicit Pack URIs
-      with versions. No implicit "latest".
-      **R3.5**: per-environment pluginCatalog Ascription.
-      **R6 (end-state)**: Pack URIs resolve to
-      DM-governed Plug-in Definitions.
-    end note
 
-    component "Control\n(scheduler + lifecycle)" as Control
+    component "Control\n(scheduler)" as Control
+    component "ContributionResolver\n(per-panel)" as Resolver
+    Control *-- Resolver
 
     package "Engine utilities" as Utils {
       component "Snapshot" as Snapshot
@@ -65,7 +60,21 @@ frame "PD - GSM Sourcer - Component architecture" {
       component "RunLedger (PG)" as RunLedger
     }
 
-    component "Blackboard\n(L0..L3 hypotheses)" as Blackboard
+    package "Blackboard\n(panels = aspects of the problem space)" as Blackboard {
+      component "SourceInterpretation" as P_SI
+      component "SubjectIdentity" as P_ID
+      component "Archetyping" as P_AR
+      component "Statement" as P_ST
+      component "Granularity" as P_GR
+      component "Evidence" as P_EV
+      component "Confidence" as P_CO
+    }
+
+    package "Pipeline (engine-only)" as Pipeline {
+      component "Validation stage\n(JsonSchemaValidator)" as VStage
+      component "Registration stage\n(DefManClient)" as RStage
+      VStage --> RStage
+    }
 
     package "Sandbox" as Sandbox {
       component "KS classloader 1" as CL1
@@ -78,15 +87,17 @@ frame "PD - GSM Sourcer - Component architecture" {
     RunControl --> PackResolver : load packs
     RunControl --> Control : start Run
     Control --> Sandbox : fire KSs
-    Control --> Blackboard : post / read
+    Control --> Blackboard : post / read / resolve
+    Blackboard --> Pipeline : converged contributions
+    Pipeline --> Validator
+    Pipeline --> DefManClient
+    Pipeline --> RunLedger
     Control --> Snapshot
     Control --> BundleStore : checkpoint
     Control --> ArchetypeResolver
-    Control --> Validator : L1 -> L2
-    Control --> DefManClient : L2 -> L3
-    Control --> RunLedger : audit
     Control --> Inference : tool wiring
     Control --> DefManExplore : tool wiring
+    Control --> RunLedger : audit
 
     Sandbox -( CCtx
     CCtx -- Blackboard
@@ -111,7 +122,7 @@ frame "PD - GSM Sourcer - Component architecture" {
 
   package "External systems" as External {
     component "DefMan API\n(SIE Definition Manager)" as DefMan
-    component "LLM provider(s)\n(OpenAI / Anthropic / local)" as LlmProvider
+    component "LLM provider(s)" as LlmProvider
     component "Source artifacts\n(opaque to engine)" as Source
   }
 
@@ -123,8 +134,7 @@ frame "PD - GSM Sourcer - Component architecture" {
   note bottom of Sandbox
     **Sandboxing rules:**
     - Each pack loaded in its own classloader.
-    - Pack JARs scanned at load (jdeps): forbidden packages rejected
-      (okhttp, apache.http, java.net.Socket usage outside ControlContext, ...).
+    - Pack JARs scanned at load (jdeps): forbidden packages rejected.
     - Network egress denied at pack-classloader scope.
     - LLM and DefMan calls only via ControlContext services.
   end note

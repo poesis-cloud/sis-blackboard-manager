@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/ks-descriptor/v1",
   "title": "KnowledgeSourceDescriptor",
-  "description": "Declarative metadata for a Knowledge Source (KS). Loaded by Control without invoking the KS.",
+  "description": "Declarative metadata for a Knowledge Source (KS). Loaded by Control without invoking the KS. NOTE: KSs are unaware of each other (canonical Blackboard rule). Ordering between KSs MUST be expressed exclusively through trigger predicates over Blackboard state — there is no `dependsOn` field.",
   "type": "object",
-  "required": ["id", "family", "writesLevel", "readsLevels", "triggerPredicate", "determinismDefault", "parallelSafe"],
+  "required": ["id", "family", "writesPanel", "readsPanels", "triggerPredicate", "determinismDefault", "parallelSafe"],
   "properties": {
     "id": {
       "type": "string",
@@ -15,6 +15,7 @@
       "type": "string",
       "enum": [
         "DiscoveryKS",
+        "IdentificationKS",
         "ArchetypingKS",
         "StatementShapingKS",
         "ReconciliationKS",
@@ -23,40 +24,46 @@
         "ConfidenceSynthesisKS"
       ]
     },
-    "writesLevel": {
+    "writesPanel": {
       "type": "string",
-      "enum": ["L0", "L1"],
-      "description": "L2 and L3 are engine-only."
+      "enum": ["SourceInterpretation", "SubjectIdentity", "Archetyping", "Statement", "Granularity", "Evidence", "Confidence"],
+      "description": "The single Blackboard panel this KS contributes to."
     },
     "writesSlots": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Slot names this KS writes (only meaningful for L1 KSs)."
+      "description": "Optional: panel-specific slot names this KS writes (e.g. 'archetypeRef'). Defaults to the panel's primary slot."
     },
-    "readsLevels": {
+    "readsPanels": {
       "type": "array",
-      "items": { "type": "string", "enum": ["SOURCE_CONTEXT", "L0", "L1", "L2"] },
+      "items": {
+        "type": "string",
+        "enum": ["SourceInterpretation", "SubjectIdentity", "Archetyping", "Statement", "Granularity", "Evidence", "Confidence"]
+      },
       "uniqueItems": true,
-      "description": "Levels this KS reads. Invariant: every read level <= writesLevel (with SOURCE_CONTEXT < L0)."
+      "description": "Panels this KS reads. Used by Control for parallelism analysis. NO transitive KS coupling: a KS reads Blackboard state, never another KS."
     },
     "triggerPredicate": {
       "type": "string",
-      "description": "Tiny declarative DSL evaluated by Control. Read-only structural checks; no side effects, no method calls. Example: 'level == L1 && archetypeRefs? && !statement?'"
+      "description": "Tiny declarative DSL over Blackboard state. Read-only; no side effects, no method calls. May reference: panel kind, presence of resolved panel values for an identity, signals on SourceInterpretations, set membership. Example: 'panel == Statement && resolved(Archetyping, identity) && !contributedBy(self, identity)'."
     },
-    "dependsOn": {
+    "appliesToInterpretationKinds": {
       "type": "array",
-      "items": { "type": "string", "format": "uri" },
-      "uniqueItems": true,
-      "description": "Explicit upstream KS dependencies. Control will not fire this KS for a hypothesis lineage until all dependsOn KSs have either contributed or declared SKIP."
+      "items": { "type": "string" },
+      "description": "Optional filter for KSs whose trigger inspects SourceInterpretation.kind (e.g. ['CodeUnit', 'JpaEntity']). Used by Control for fast eligibility pruning; semantically equivalent to a check inside triggerPredicate."
     },
     "determinismDefault": {
       "type": "string",
-      "enum": ["DETERMINISTIC", "NON_DETERMINISTIC"],
-      "description": "Default determinism class. Per-Contribution overrides allowed (a KS may emit DETERMINISTIC and NON_DETERMINISTIC contributions)."
+      "enum": ["DETERMINISTIC", "NON_DETERMINISTIC"]
     },
     "parallelSafe": {
       "type": "boolean",
-      "description": "If true, Control may invoke this KS in parallel with other parallelSafe KSs whose read/write sets do not overlap on the same hypothesis."
+      "description": "If true, Control may invoke this KS in parallel with other parallelSafe KSs whose readsPanels/writesPanel do not conflict on overlapping SubjectIdentities."
+    },
+    "resolverHint": {
+      "type": "string",
+      "enum": ["highestConfidence", "firstWriter", "failOnConflict", "userMediated"],
+      "description": "Optional advisory: this KS author believes this resolver fits its panel/slot best. Control's effective resolver = (RunConfig override) > (KS hint) > (engine default for that panel)."
     },
     "defmanExplorationNeeded": { "type": "boolean", "default": false },
     "defmanReadScope": {

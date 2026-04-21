@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/panels/SourceInterpretation/v1",
+  "title": "SourceInterpretationValue",
+  "description": "Value posted onto the SourceInterpretation panel. Polymorphic by `kind`. Open-ended; Sourcing Packs add new kinds. No SubjectIdentity is referenced here (interpretations precede identification).",
+  "type": "object",
+  "required": [
+    "kind",
+    "sourceContextId",
+    "sourceIdentityKey",
+    "contentRef"
+  ],
+  "properties": {
+    "kind": {
+      "description": "Open-ended discriminator. Examples: CodeUnit, OpenApiOperation, KafkaTopic, JpaEntity, MavenDependency, TestSpec, IacResource, GitCommit, FileTreeNode, ConfigEntry, ProtoMessage, GraphqlSchema, DbTable, ModuleSpec.",
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceContextId": {
+      "type": "string"
+    },
+    "sourceIdentityKey": {
+      "type": "string",
+      "description": "Stable per-source identity. MUST be deterministic for a given input."
+    },
+    "contentRef": {
+      "type": "string",
+      "description": "Reference into BundleStore for raw content."
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Kind-specific structured fields owned by the emitting Sourcing Pack."
+    },
+    "signals": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Free-form discriminator hints used by IdentificationKSs."
+    }
+  },
+  "additionalProperties": false
+}

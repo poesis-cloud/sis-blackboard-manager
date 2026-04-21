@@ -21,126 +21,189 @@ skinparam classFontColor #24292F
 skinparam noteBackgroundColor #FFF8C5
 skinparam noteBorderColor #57606A
 
-frame "CD - GSM Sourcer - Blackboard structure" {
+frame "CD - GSM Sourcer - Blackboard structure (panels + contributions)" {
 
   note as BlackboardNote
-    **Blackboard pattern (Hayes-Roth / Erman-Lesser canonical)**
+    **Canonical Blackboard pattern (Hayes-Roth / Erman-Lesser).**
 
-    The Blackboard is the shared, structured workspace gsm-sourcer maintains
-    during a Run. Knowledge Sources (KSs) post Hypotheses on it; Control
-    schedules KSs based on declarative trigger predicates over Blackboard
-    state.
+    The Blackboard is partitioned into **panels**, each representing
+    an **aspect of the problem space** (NOT a temporal phase). KSs
+    post **Contributions** onto panels; multiple Contributions on
+    the same (panel, subjectIdentityId, slot) coexist as competing
+    partial solutions.
 
-    **Levels are organizing semantics**, not a forced execution gradient.
-    KSs may read across multiple levels and post to one. Control derives
-    ordering from explicit `dependsOn` declarations + read/write sets +
-    trigger predicates.
+    **Control resolves** the effective value at read time using a
+    **ContributionResolver** (per-panel; configurable per Run):
+    `highestConfidence` | `firstWriter` | `failOnConflict` |
+    `userMediated` | `collectAll`.
 
     **Validation Rules:**
-    - Every Hypothesis carries engine-attached `derivedFrom` and `contributors`.
-    - Every Hypothesis at L1+ MUST carry at least the base GSM primitive
-      Archetype URI in `archetypeRefs`.
-    - Slot writes are monotonic (a slot, once filled, can only be REPLACED
-      via user override at a Checkpoint, never silently overwritten by a KS).
-    - Slot conflicts between KSs MUST fail-loud with a Diagnostic; Control
-      records the conflict and pauses the affected lineage.
+    - KSs are unaware of each other; coupling is allowed ONLY through
+      Blackboard state (no `dependsOn` between KSs).
+    - Contributions are append-only and immutable.
+    - SourceInterpretation contributions reference NO SubjectIdentity
+      (they precede subject identification).
+    - Every other-panel contribution MUST reference exactly one
+      SubjectIdentity contribution id.
+    - Engine-managed fields on every Contribution: `derivedFrom`,
+      `contributorKsId`, `createdAt`. KSs cannot fabricate them.
   end note
 
-  package "Blackboard" {
+  package "Blackboard panels (aspects of the problem space)" as Panels {
 
-    abstract class Hypothesis {
-      +id : HypothesisId
-      +level : Level
-      +derivedFrom : List<HypothesisId>
-      +contributors : List<KnowledgeSourceId>
+    class "SourceInterpretation panel" as PSI <<panel>> {
+      Holds typed interpretations
+      of source artifacts.
+      Polymorphic: many `kind`s coexist.
+    }
+
+    class "SubjectIdentity panel" as PID <<panel>> {
+      Holds hypotheses about
+      what GSM subject(s) the
+      interpretations describe.
+    }
+
+    class "Archetyping panel" as PAR <<panel>> {
+      Holds hypotheses about
+      which Archetype URIs apply
+      to a SubjectIdentity.
+    }
+
+    class "Statement panel" as PST <<panel>> {
+      Holds hypotheses about
+      the populated GSM statement
+      payload for a SubjectIdentity.
+    }
+
+    class "Granularity panel" as PGR <<panel>> {
+      Holds hypotheses about
+      consolidation decisions
+      (keep / drop / split / merge).
+    }
+
+    class "Evidence panel" as PEV <<panel>> {
+      Holds additive corroboration
+      items (resolver = collectAll).
+    }
+
+    class "Confidence panel" as PCO <<panel>> {
+      Holds synthesized confidence
+      scores per panel decision.
+    }
+  }
+
+  package "Contribution model" as CM {
+
+    class Contribution {
+      +id : ContributionId
+      +panel : Panel
+      +subjectIdentityId : SubjectIdentityId?
+      +slot : SlotName
+      +value : PanelValue
+      +contributorKsId : KnowledgeSourceId
+      +confidence : Float?
+      +rationale : String?
+      +determinism : enum { DETERMINISTIC, NON_DETERMINISTIC }
+      +cacheKey : CacheKey?
+      +derivedFrom : List<ContributionId>
+      +supersedes : List<ContributionId>
       +diagnostics : List<Diagnostic>
       +createdAt : Instant
     }
-
-    note right of Hypothesis
-      `derivedFrom` and `contributors` are
-      engine-managed. KSs cannot write them.
+    note right of Contribution
+      `cacheKey` MANDATORY when determinism = NON_DETERMINISTIC.
+      `subjectIdentityId` REQUIRED on every panel except
+      SourceInterpretation.
+      `supersedes` is set by user-mediated overrides.
     end note
 
-    class SourceElement <<L0>> {
+    abstract class PanelValue
+    class SourceInterpretationValue {
+      +kind : InterpretationKind
       +sourceContextId : SourceContextId
       +sourceIdentityKey : String
       +contentRef : OpaqueRef
-      +signals : Map<String, String>
+      +payload : Map<String, Any>?
+      +signals : Map<String, String>?
     }
-    note right of SourceElement
-      **L0 — absolute mirror of the source.**
-      No filtering, no opinion. Reproducibility
-      ground truth. Profile-based intake filter
-      applies at L0 -> L1 promotion (Control),
-      not here.
-
-      `sourceIdentityKey` is the canonical hash
-      Reconciliation uses to merge candidates.
+    note right of SourceInterpretationValue
+      `kind` is an OPEN enum. Engine ships:
+      CodeUnit, OpenApiOperation, KafkaTopic,
+      JpaEntity, MavenDependency, TestSpec,
+      IacResource, GitCommit, ConfigEntry,
+      ProtoMessage, GraphqlSchema.
+      Sourcing Packs may register more.
     end note
 
-    class CandidateAscriptionHypothesis <<L1>> {
-      +subjectType : GsmSubjectKind
-      +archetypeRefs : Set<ArchetypeUri>
-      +archetypeSchema : ResolvedJsonSchema?
-      +statement : Map<String, Any>?
-      +granularityVerdict : GranularityVerdict?
-      +evidence : List<Evidence>
-      +confidence : Confidence?
-      +sourceIdentityKey : String
+    class SubjectIdentityValue {
+      +subjectKind : GsmSubjectKind
+      +identityKey : String
+      +interpretsIds : List<ContributionId>
+      +displayName : String?
+      +rationale : String?
     }
-    note right of CandidateAscriptionHypothesis
-      **L1 — slot-filled, monotonic.**
 
-      Slots filled by different KS families:
-      - archetypeRefs / archetypeSchema by ArchetypingKS
-        (engine resolves schema from refs)
-      - statement by StatementShapingKSs (incremental
-        validation against archetypeSchema on each write)
-      - granularityVerdict by GranularityKS (after statement)
-      - evidence[] by EvidenceCollectionKSs (additive)
-      - confidence by ConfidenceSynthesisKS (single)
-
-      **Validation Rules:**
-      - archetypeRefs MUST contain the base GSM primitive URI.
-      - statement writes MUST validate incrementally against
-        archetypeSchema; failed writes go to diagnostics.
-      - granularityVerdict cannot be set before statement.
-      - confidence cannot be set before evidence is non-empty.
+    class ArchetypingValue {
+      +archetypeRef : ArchetypeUri
+      +rationale : String?
+    }
+    note right of ArchetypingValue
+      ONE archetype per Contribution.
+      Resolved Archetyping for a SubjectIdentity =
+      union of accepted contributions
+      (resolver default: collectAll, with per-ref
+      conflict via failOnConflict if competing rationales).
     end note
 
-    class ValidatedCandidateAscriptionHypothesis <<L2>> {
-      +candidate : CandidateAscriptionHypothesis
-      +validationReport : ValidationReport
+    class StatementValue {
+      +statement : Map<String, Any>
+      +completeness : enum { partial, full }
+      +shapingMethod : String
+      +rationale : String?
     }
-    note right of ValidatedCandidateAscriptionHypothesis
-      **L2 — engine-validated.** Posted only by Control.
-      Promotion gate: full statement validates against
-      the resolved archetypeSchema (allOf-expanded).
-    end note
 
-    class RegisteredAscription <<L3>> {
-      +candidate : CandidateAscriptionHypothesis
-      +draftAscriptionUri : AscriptionUri
-      +registeredAt : Instant
+    class GranularityValue {
+      +verdict : enum { keep, drop, splitInto, mergeWith }
+      +targetIdentityKeys : List<String>
+      +rationale : String?
     }
-    note right of RegisteredAscription
-      **L3 — registered.** Posted only by Control after
-      Checkpoint-B approval. Engine submitted the DRAFT
-      to DefMan and recorded the assigned URI.
-    end note
 
-    Hypothesis <|-- SourceElement
-    Hypothesis <|-- CandidateAscriptionHypothesis
-    Hypothesis <|-- ValidatedCandidateAscriptionHypothesis
-    Hypothesis <|-- RegisteredAscription
+    class EvidenceValue {
+      +source : String
+      +signal : String
+      +weight : Float [-1..1]
+      +rationale : String?
+      +supportingInterpretsIds : List<ContributionId>
+    }
 
-    SourceElement "1" -[#blue]-> "1..*" CandidateAscriptionHypothesis : derives
-    CandidateAscriptionHypothesis "1" -[#blue]-> "1" ValidatedCandidateAscriptionHypothesis : promotes
-    ValidatedCandidateAscriptionHypothesis "1" -[#blue]-> "1" RegisteredAscription : promotes
+    class ConfidenceValue {
+      +targetPanel : enum { Archetyping, Statement, Granularity }
+      +score : Float [0..1]
+      +method : String
+      +supportingEvidenceIds : List<ContributionId>
+      +rationale : String?
+    }
+
+    PanelValue <|-- SourceInterpretationValue
+    PanelValue <|-- SubjectIdentityValue
+    PanelValue <|-- ArchetypingValue
+    PanelValue <|-- StatementValue
+    PanelValue <|-- GranularityValue
+    PanelValue <|-- EvidenceValue
+    PanelValue <|-- ConfidenceValue
+
+    Contribution "1" *-- "1" PanelValue : value
   }
 
-  package "Slot value types" {
+  PSI ..> Contribution : holds (value : SourceInterpretationValue)
+  PID ..> Contribution : holds (value : SubjectIdentityValue)
+  PAR ..> Contribution : holds (value : ArchetypingValue)
+  PST ..> Contribution : holds (value : StatementValue)
+  PGR ..> Contribution : holds (value : GranularityValue)
+  PEV ..> Contribution : holds (value : EvidenceValue)
+  PCO ..> Contribution : holds (value : ConfidenceValue)
+
+  package "Common types" as Types {
     enum GsmSubjectKind {
       Structure
       Mechanism
@@ -151,36 +214,20 @@ frame "CD - GSM Sourcer - Blackboard structure" {
       Directive
       Norm
     }
-
-    class GranularityVerdict {
-      +kind : enum { keep, drop, splitInto, mergeWith }
-      +targetIds : List<HypothesisId>
-      +rationale : String
+    enum Panel {
+      SourceInterpretation
+      SubjectIdentity
+      Archetyping
+      Statement
+      Granularity
+      Evidence
+      Confidence
     }
-
-    class Evidence {
-      +source : String
-      +signal : String
-      +weight : Float
-      +rationale : String
-    }
-
-    class Confidence {
-      +score : Float
-      +method : String
-      +supportingEvidence : List<HypothesisId>
-    }
-
     class Diagnostic {
       +severity : enum { info, warning, error, fatal }
       +code : String
       +message : String
       +sourceKsId : KnowledgeSourceId?
-    }
-
-    class ValidationReport {
-      +ok : Boolean
-      +failures : List<SchemaFailure>
     }
   }
 }

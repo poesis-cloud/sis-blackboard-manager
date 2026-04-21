@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/panels/Confidence/v1",
+  "title": "Confidence contribution value",
+  "description": "Value type for contributions on the Confidence panel. Each contribution synthesizes a single confidence score for a target panel decision (Archetyping, Statement, or Granularity) on a SubjectIdentity.",
+  "type": "object",
+  "required": ["targetPanel", "score", "method"],
+  "properties": {
+    "targetPanel": {
+      "type": "string",
+      "enum": ["Archetyping", "Statement", "Granularity"],
+      "description": "Which panel decision this confidence applies to."
+    },
+    "score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "method": {
+      "type": "string",
+      "description": "Aggregation method (e.g. 'weighted-evidence', 'llm-self-report', 'fixed-prior')."
+    },
+    "supportingEvidenceIds": { "type": "array", "items": { "type": "string" } },
+    "rationale": { "type": "string" }
+  },
+  "additionalProperties": false
+}

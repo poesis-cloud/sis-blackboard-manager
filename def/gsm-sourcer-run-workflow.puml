@@ -23,164 +23,153 @@ skinparam sequence {
 skinparam noteBackgroundColor #FFF8C5
 skinparam noteBorderColor #57606A
 
-title GSM Sourcer - End-to-end Run workflow
+title GSM Sourcer - End-to-end Run workflow (Blackboard convergence + Pipeline)
 
 actor "Run Operator" as Op
 actor "Reviewer" as Rev
 
-participant "Run Control\n(REST API)" as RC
+participant "Run Control" as RC
 participant "Plug-in Resolver" as PR
-participant "Control\n(scheduler)" as Ctrl
-participant "Blackboard" as BB
-participant "BundleStore" as BS
-participant "RunLedger" as RL
-participant "Snapshot\nutility" as Snap
-participant "ArchetypeResolver" as AR
+participant "Control" as Ctrl
+participant "Blackboard\n(panels)" as BB
+participant "Resolver\n(per-panel)" as Res
 participant "Sandboxed KSs\n(per Pack)" as KSs
 participant "InferenceService" as Inf
-participant "DefManExploration\nService" as DefExp
-participant "JsonSchema\nValidator" as JV
+participant "DefManExploration" as DefExp
+participant "ArchetypeResolver" as AR
+participant "Pipeline" as Pipe
+participant "JsonSchemaValidator" as JV
 participant "DefManClient" as DM
+participant "BundleStore" as BS
+participant "RunLedger" as RL
 
 == Run start ==
 
-Op -> RC : POST /runs RunRequest\n{sourceContext, packs[], profile, targetCatalogues[]}
+Op -> RC : POST /runs RunRequest\n{sourceContext, packs[], profile,\n targetCatalogues[], contributionResolvers}
 RC -> PR : resolve packs (URIs+versions)
 PR -> RC : KS classloaders ready
 RC -> Ctrl : startRun(runId, config)
 Ctrl -> RL : record Run START
-Ctrl -> BB : open empty Blackboard
-Ctrl -> Snap : snapshot(sourceContext)
-Snap -> BS : store opaque bytes\n(content-addressable)
-Snap --> Ctrl : SourceContextSnapshot
+Ctrl -> BB : open empty Blackboard\n(7 panels)
+Ctrl -> BS : snapshot(sourceContext)
+BS -> Ctrl : SourceContextSnapshot
 
-== L0 Discovery ==
+== Blackboard convergence loop (data-driven, KSs unaware of each other) ==
 
-Ctrl -> KSs : fire DiscoveryKSs\n(trigger: SourceContext available)
-KSs -> KSs : parse, walk, etc.\n(KS-internal)
-KSs -> BB : post L0 SourceElements
-note over Ctrl, BB
-  L0 is ABSOLUTE: no filtering.
-  Reproducibility ground truth.
+loop until quiescence OR maxIterations reached
+
+  Ctrl -> Ctrl : enumerate eligible KSs\n(triggerPredicate true vs current Blackboard state)
+  Ctrl -> KSs : fire eligible KSs\n(parallelSafe ones in parallel)
+
+  alt DiscoveryKS fires
+    KSs -> BB : post Contribution(panel=SourceInterpretation,\n  value=SourceInterpretationValue{kind, payload, signals})
+  else IdentificationKS fires
+    KSs -> BB : query SourceInterpretations
+    KSs -> BB : post Contribution(panel=SubjectIdentity,\n  value={subjectKind, identityKey, interpretsIds})
+    note over Ctrl, BB
+      Axis-1 intake filter (Functional / Reachability / ...)
+      runs HERE as a Control admission policy on
+      SubjectIdentity contributions.
+    end note
+  else ReconciliationKS fires
+    KSs -> BB : query SubjectIdentity contributions
+    KSs -> BB : post merging SubjectIdentity contribution
+  else ArchetypingKS fires
+    KSs -> BB : resolved(SubjectIdentity, identity)
+    KSs -> DefExp : (optional) navigateFrom siblings
+    DefExp --> KSs : ExplorationResult
+    KSs -> BB : post Contribution(panel=Archetyping,\n  value={archetypeRef, rationale})
+  else StatementShapingKS fires
+    KSs -> BB : resolved(Archetyping, identity)
+    Ctrl -> AR : resolveSchema(archetypeRefs)
+    AR --> Ctrl : ResolvedJsonSchema
+    alt LLM-driven shaping
+      KSs -> Inf : completeStatement(identity)\n  withTools({DEFMAN_EXPLORATION})
+      loop function-calling
+        Inf -> DefExp : tool call (LLM-issued)
+        DefExp --> Inf : result (per-Run cache)
+      end
+      Inf --> KSs : InferenceResult\n  (NON_DETERMINISTIC + cacheKey)
+    else deterministic shaping
+      KSs -> KSs : structural extraction
+    end
+    KSs -> JV : incremental validation\n  (partial statement vs schema)
+    JV --> KSs : OK | failures
+    KSs -> BB : post Contribution(panel=Statement,\n  value={statement, completeness, shapingMethod})
+  else GranularityKS fires
+    KSs -> BB : resolved(Statement, identity) +\n peers in same Structure
+    KSs -> BB : post Contribution(panel=Granularity,\n  value={verdict, targetIdentityKeys})
+  else EvidenceCollectionKS fires
+    KSs -> BB : resolved(Statement, identity)
+    KSs -> BB : post Contribution(panel=Evidence,\n  value={source, signal, weight})
+  else ConfidenceSynthesisKS fires
+    KSs -> BB : evidence + diagnostics
+    KSs -> BB : post Contribution(panel=Confidence,\n  value={targetPanel, score, method})
+  end
+
+  Ctrl -> Res : resolve panels affected
+  Res -> BB : update resolved view
+
+end
+
+note over Ctrl
+  Quiescence = N consecutive iterations with zero
+  new Contributions (configurable). The loop is
+  data-driven; ordering between KSs is emergent
+  from triggerPredicates over Blackboard state.
 end note
 
-== L0 -> L1 promotion (intake filter) ==
-
-loop for each L0 SourceElement
-  Ctrl -> Ctrl : evaluate Axis-1 profile\nagainst signals
-  alt profile match
-    Ctrl -> BB : post L1 Initial CandidateAscriptionHypothesis\n(empty slots)
-  else profile reject
-    Ctrl -> RL : diagnostic (intake filter rejected)
-  end
-end
-
-== L1 Archetyping ==
-
-Ctrl -> KSs : fire ArchetypingKSs\n(trigger: L1 && !archetypeRefs?)
-KSs -> BB : query L0 + L1 lineage
-KSs -> DefExp : (optional) navigateFrom existing siblings
-DefExp --> KSs : ExplorationResult
-KSs -> BB : post archetypeRefs slot
-Ctrl -> AR : resolve schema(refs)
-AR --> Ctrl : ResolvedJsonSchema (allOf-expanded)
-Ctrl -> BB : post archetypeSchema slot
-
-== L1 StatementShaping ==
-
-Ctrl -> KSs : fire StatementShapingKSs\n(trigger: L1 && archetypeRefs? && !statement?)
-KSs -> BB : read archetypeSchema + L0 contentRef
-
-alt LLM-driven shaping
-  KSs -> Inf : completeStatement(c)\nwithTools({DEFMAN_EXPLORATION})
-  loop function-calling
-    Inf -> DefExp : tool call (LLM-issued)
-    DefExp --> Inf : result (cached per Run)
-  end
-  Inf --> KSs : InferenceResult\n(NON_DETERMINISTIC + cacheKey)
-else deterministic shaping
-  KSs -> KSs : structural extraction
-end
-
-KSs -> JV : incremental validation\n(partial statement vs schema)
-JV --> KSs : OK | failures
-KSs -> BB : post statement slot\n(or diagnostic on failure)
-
-== L1 enrichment slots (parallel where parallelSafe) ==
-
-par GranularityKS (Axis-2 consolidation)
-  Ctrl -> KSs : fire (trigger: L1 && statement? && !granularityVerdict?)
-  KSs -> BB : read peer L1 candidates\nin same Structure
-  KSs -> BB : post granularityVerdict slot
-also EvidenceCollectionKSs (additive)
-  Ctrl -> KSs : fire (trigger: L1 && statement?)
-  KSs -> BB : post evidence slot (additive)
-end
-
-opt heuristic profile active
-  Ctrl -> KSs : fire ConfidenceSynthesisKS\n(trigger: L1 && evidence.size > 0 && !confidence?)
-  KSs -> BB : read evidence + diagnostics
-  KSs -> BB : post confidence slot
-end
-
-== Reconciliation ==
-
-opt overlapping discoveries
-  Ctrl -> KSs : fire ReconciliationKSs\n(trigger: 2+ L1 with same sourceIdentityKey)
-  KSs -> BB : merge candidates\n(union archetypeRefs, etc.)
-end
-
-== Checkpoint-A ==
+== Checkpoint-A (governance overlay) ==
 
 Ctrl -> BS : snapshot Blackboard (Stage-A)
 Ctrl -> RL : record CHECKPOINT_A_PENDING
+Rev -> RC : GET /runs/{id}/blackboard
+RC --> Rev : Stage-A snapshot (resolved + competing contributions)
 
-alt synchronous Run
-  Rev -> RC : GET /runs/{id}/blackboard
-  RC --> Rev : Stage-A snapshot
-  Rev -> RC : POST /runs/{id}/checkpoint approve | override | reject
-  alt approve
-    RC -> Ctrl : resume
-  else override
-    RC -> Ctrl : patch slot S on H
-    Ctrl -> BB : invalidate dependent hypotheses\n(walk derivedFrom)
-    Ctrl -> KSs : re-fire affected triggers
-  else reject
-    RC -> Ctrl : drop H + dependents
-  end
-else asynchronous Run
-  Ctrl -> RC : status = AWAITING_REVIEW (returns)
+alt approve
+  Rev -> RC : approve all
+  RC -> Ctrl : resume
+else override
+  Rev -> RC : POST override on (panel, identity, slot)
+  RC -> Ctrl : append user Contribution (supersedes prior winner)
+  Ctrl -> BB : post + invalidate dependent resolved values
+  Ctrl -> KSs : re-fire affected triggers (cascade -> back to convergence loop)
+else reject
+  Rev -> RC : drop SubjectIdentity
+  RC -> Ctrl : remove identity + dependent contributions
 end
 
-== L1 -> L2 Validation (engine-only) ==
+== Pipeline: Validation stage (engine-only) ==
 
-loop for each L1 Ready
-  Ctrl -> JV : validate statement vs archetypeSchema (full)
+loop for each approved SubjectIdentity
+  Ctrl -> Pipe : validate(identity)
+  Pipe -> AR : resolveSchema(resolved Archetyping)
+  Pipe -> JV : validate(resolved Statement, schema)
   alt OK
-    Ctrl -> BB : post L2 ValidatedCandidateAscriptionHypothesis
+    Pipe -> Pipe : produce ValidatedAscriptionDraft
   else failed
-    Ctrl -> BB : add diagnostic
-    Ctrl -> KSs : re-fire StatementShapingKSs (capped retries)
+    Pipe -> BB : post Diagnostic
+    Pipe -> KSs : re-fire StatementShapingKSs (capped retries -> back to convergence)
   end
 end
 
-== Checkpoint-B ==
+== Checkpoint-B (governance overlay) ==
 
-Ctrl -> BS : snapshot Blackboard (Stage-B)
+Ctrl -> BS : snapshot Pipeline state (Stage-B)
 Ctrl -> RL : record CHECKPOINT_B_PENDING
-Rev -> RC : approve | override | reject (same protocol)
+Rev -> RC : approve | override | reject (same protocol as Checkpoint-A)
 
-== L2 -> L3 Registration (engine-only) ==
+== Pipeline: Registration stage (engine-only) ==
 
-loop for each L2 approved
-  Ctrl -> DM : POST /ascriptions DRAFT
-  DM --> Ctrl : AscriptionUri
-  Ctrl -> BB : post L3 RegisteredAscription
+loop for each Checkpoint-B-approved ValidatedAscriptionDraft
+  Pipe -> DM : POST /ascriptions DRAFT
+  DM --> Pipe : AscriptionUri
+  Pipe -> Pipe : record RegisteredAscription
 end
 
 == Run end ==
 
-Ctrl -> BS : final Blackboard snapshot
+Ctrl -> BS : final Blackboard + Pipeline snapshot
 Ctrl -> RL : record Run END (success | partial | failed)
 RC --> Op : RunResult\n{registeredCount, diagnostics, bundleRef, ledgerRef}
 

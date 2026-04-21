@@ -52,13 +52,13 @@
       "properties": {
         "axis1": {
           "type": "string",
-          "description": "Intake filter profile (Axis-1, depth). Default: Functional. Future: Reachability, TestCorroborated, HotspotWeighted, CoverageDriven.",
-          "enum": ["Functional", "Reachability", "TestCorroborated", "HotspotWeighted", "CoverageDriven"]
+          "enum": ["Functional", "Reachability", "TestCorroborated", "HotspotWeighted", "CoverageDriven"],
+          "description": "Intake filter profile (Axis-1, depth). Applied as a Control admission policy at SubjectIdentity creation time."
         },
         "axis2": {
           "type": "string",
-          "description": "Mechanism granularity / consolidation profile (Axis-2). Default: Standard.",
-          "enum": ["Standard", "Coarse", "Fine", "BoundaryOnly"]
+          "enum": ["Standard", "Coarse", "Fine", "BoundaryOnly"],
+          "description": "Granularity / consolidation profile (Axis-2). Biases which GranularityKSs are eligible to fire."
         }
       },
       "additionalProperties": false
@@ -66,14 +66,35 @@
     "targetCatalogues": {
       "type": "array",
       "items": { "type": "string", "format": "uri" },
-      "description": "Catalogue archetype roots a contributor may attach (e.g. TOGAF, SAFe, ISO 25000). Restricts which ArchetypingKS contributions are eligible to fire."
+      "description": "Catalogue archetype roots a contributor may attach (e.g. TOGAF, SAFe, ISO 25000). Restricts which ArchetypingKS contributions are eligible."
+    },
+    "contributionResolvers": {
+      "type": "object",
+      "description": "Per-panel ContributionResolver selection. Default per panel: SourceInterpretation = collectAll; SubjectIdentity = highestConfidence; Archetyping = collectAll (the resolved value is the union of accepted contributions); Statement = highestConfidence; Granularity = highestConfidence; Evidence = collectAll; Confidence = highestConfidence.",
+      "properties": {
+        "SubjectIdentity": { "$ref": "#/$defs/Resolver" },
+        "Archetyping":     { "$ref": "#/$defs/Resolver" },
+        "Statement":       { "$ref": "#/$defs/Resolver" },
+        "Granularity":     { "$ref": "#/$defs/Resolver" },
+        "Confidence":      { "$ref": "#/$defs/Resolver" }
+      },
+      "additionalProperties": false
     },
     "checkpoints": {
       "type": "object",
       "properties": {
-        "checkpointA": { "type": "boolean", "default": true },
-        "checkpointB": { "type": "boolean", "default": true },
+        "checkpointA": { "type": "boolean", "default": true, "description": "Pause after Blackboard convergence, before Validation pipeline stage." },
+        "checkpointB": { "type": "boolean", "default": true, "description": "Pause after Validation, before Registration pipeline stage." },
         "synchronous": { "type": "boolean", "default": false }
+      },
+      "additionalProperties": false
+    },
+    "convergence": {
+      "type": "object",
+      "description": "Stopping criteria for the Blackboard convergence loop.",
+      "properties": {
+        "maxIterations": { "type": "integer", "minimum": 1, "default": 100 },
+        "quiesceAfterEmptyIterations": { "type": "integer", "minimum": 1, "default": 1, "description": "Number of consecutive iterations with zero new Contributions before declaring quiescence." }
       },
       "additionalProperties": false
     },
@@ -96,6 +117,13 @@
         "inferenceCostUsd": { "type": "number" },
         "defmanCalls": { "type": "integer" }
       }
+    }
+  },
+  "$defs": {
+    "Resolver": {
+      "type": "string",
+      "enum": ["highestConfidence", "firstWriter", "failOnConflict", "userMediated", "collectAll"],
+      "description": "ContributionResolver. `collectAll` = effective value is union/concat of all contributions (used for additive panels). `userMediated` = escalate to a Checkpoint if more than one contribution exists."
     }
   },
   "additionalProperties": false
