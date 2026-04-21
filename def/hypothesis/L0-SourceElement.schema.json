@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/hypothesis/L0-SourceElement/v1",
+  "title": "L0 SourceElement",
+  "description": "Absolute mirror of a discovered source element. Posted by DiscoveryKS. No filtering applied at this level (Axis-1 intake filter is applied at L0 -> L1 promotion by Control).",
+  "type": "object",
+  "required": ["id", "level", "sourceContextId", "sourceIdentityKey", "contentRef", "derivedFrom", "contributors", "createdAt"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Engine-minted stable Hypothesis id."
+    },
+    "level": {
+      "type": "string",
+      "const": "L0"
+    },
+    "sourceContextId": {
+      "type": "string",
+      "description": "Reference to the SourceContext in the Run."
+    },
+    "sourceIdentityKey": {
+      "type": "string",
+      "description": "Canonical identity hash. Two SourceElements with equal sourceIdentityKey are considered the same source identity by Reconciliation."
+    },
+    "contentRef": {
+      "type": "string",
+      "description": "Opaque pointer into the BundleStore snapshot."
+    },
+    "signals": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "KS-defined hints (no engine semantics). Used by trigger predicates and by the Axis-1 intake filter."
+    },
+    "derivedFrom": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Engine-managed provenance chain (typically empty for L0)."
+    },
+    "contributors": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Engine-managed list of KnowledgeSourceIds that contributed."
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "gsmarc://gsm-sourcer/types/Diagnostic/v1" }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}

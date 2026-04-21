@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/hypothesis/L3-RegisteredAscription/v1",
+  "title": "L3 RegisteredAscription",
+  "description": "Engine-only terminal hypothesis. Recorded after Control submitted the DRAFT to DefMan and received its assigned URI.",
+  "type": "object",
+  "required": ["id", "level", "candidateId", "draftAscriptionUri", "registeredAt", "derivedFrom", "contributors"],
+  "properties": {
+    "id": { "type": "string" },
+    "level": { "type": "string", "const": "L3" },
+    "candidateId": { "type": "string" },
+    "draftAscriptionUri": { "type": "string", "format": "uri" },
+    "registeredAt": { "type": "string", "format": "date-time" },
+    "derivedFrom": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "contributors": { "type": "array", "items": { "type": "string" } },
+    "diagnostics": { "type": "array", "items": { "$ref": "gsmarc://gsm-sourcer/types/Diagnostic/v1" } }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,188 @@
+@startuml gsm-sourcer-blackboard
+
+' ============================================================
+' VISUAL THEME
+' ============================================================
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 12
+skinparam ArrowColor #57606A
+skinparam DefaultFontName "SansSerif"
+skinparam backgroundColor #FFFFFF
+
+skinparam packageStyle rectangle
+skinparam packageBackgroundColor #F6F8FA
+skinparam packageBorderColor #57606A
+
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #57606A
+skinparam classFontColor #24292F
+
+skinparam noteBackgroundColor #FFF8C5
+skinparam noteBorderColor #57606A
+
+frame "CD - GSM Sourcer - Blackboard structure" {
+
+  note as BlackboardNote
+    **Blackboard pattern (Hayes-Roth / Erman-Lesser canonical)**
+
+    The Blackboard is the shared, structured workspace gsm-sourcer maintains
+    during a Run. Knowledge Sources (KSs) post Hypotheses on it; Control
+    schedules KSs based on declarative trigger predicates over Blackboard
+    state.
+
+    **Levels are organizing semantics**, not a forced execution gradient.
+    KSs may read across multiple levels and post to one. Control derives
+    ordering from explicit `dependsOn` declarations + read/write sets +
+    trigger predicates.
+
+    **Validation Rules:**
+    - Every Hypothesis carries engine-attached `derivedFrom` and `contributors`.
+    - Every Hypothesis at L1+ MUST carry at least the base GSM primitive
+      Archetype URI in `archetypeRefs`.
+    - Slot writes are monotonic (a slot, once filled, can only be REPLACED
+      via user override at a Checkpoint, never silently overwritten by a KS).
+    - Slot conflicts between KSs MUST fail-loud with a Diagnostic; Control
+      records the conflict and pauses the affected lineage.
+  end note
+
+  package "Blackboard" {
+
+    abstract class Hypothesis {
+      +id : HypothesisId
+      +level : Level
+      +derivedFrom : List<HypothesisId>
+      +contributors : List<KnowledgeSourceId>
+      +diagnostics : List<Diagnostic>
+      +createdAt : Instant
+    }
+
+    note right of Hypothesis
+      `derivedFrom` and `contributors` are
+      engine-managed. KSs cannot write them.
+    end note
+
+    class SourceElement <<L0>> {
+      +sourceContextId : SourceContextId
+      +sourceIdentityKey : String
+      +contentRef : OpaqueRef
+      +signals : Map<String, String>
+    }
+    note right of SourceElement
+      **L0 — absolute mirror of the source.**
+      No filtering, no opinion. Reproducibility
+      ground truth. Profile-based intake filter
+      applies at L0 -> L1 promotion (Control),
+      not here.
+
+      `sourceIdentityKey` is the canonical hash
+      Reconciliation uses to merge candidates.
+    end note
+
+    class CandidateAscriptionHypothesis <<L1>> {
+      +subjectType : GsmSubjectKind
+      +archetypeRefs : Set<ArchetypeUri>
+      +archetypeSchema : ResolvedJsonSchema?
+      +statement : Map<String, Any>?
+      +granularityVerdict : GranularityVerdict?
+      +evidence : List<Evidence>
+      +confidence : Confidence?
+      +sourceIdentityKey : String
+    }
+    note right of CandidateAscriptionHypothesis
+      **L1 — slot-filled, monotonic.**
+
+      Slots filled by different KS families:
+      - archetypeRefs / archetypeSchema by ArchetypingKS
+        (engine resolves schema from refs)
+      - statement by StatementShapingKSs (incremental
+        validation against archetypeSchema on each write)
+      - granularityVerdict by GranularityKS (after statement)
+      - evidence[] by EvidenceCollectionKSs (additive)
+      - confidence by ConfidenceSynthesisKS (single)
+
+      **Validation Rules:**
+      - archetypeRefs MUST contain the base GSM primitive URI.
+      - statement writes MUST validate incrementally against
+        archetypeSchema; failed writes go to diagnostics.
+      - granularityVerdict cannot be set before statement.
+      - confidence cannot be set before evidence is non-empty.
+    end note
+
+    class ValidatedCandidateAscriptionHypothesis <<L2>> {
+      +candidate : CandidateAscriptionHypothesis
+      +validationReport : ValidationReport
+    }
+    note right of ValidatedCandidateAscriptionHypothesis
+      **L2 — engine-validated.** Posted only by Control.
+      Promotion gate: full statement validates against
+      the resolved archetypeSchema (allOf-expanded).
+    end note
+
+    class RegisteredAscription <<L3>> {
+      +candidate : CandidateAscriptionHypothesis
+      +draftAscriptionUri : AscriptionUri
+      +registeredAt : Instant
+    }
+    note right of RegisteredAscription
+      **L3 — registered.** Posted only by Control after
+      Checkpoint-B approval. Engine submitted the DRAFT
+      to DefMan and recorded the assigned URI.
+    end note
+
+    Hypothesis <|-- SourceElement
+    Hypothesis <|-- CandidateAscriptionHypothesis
+    Hypothesis <|-- ValidatedCandidateAscriptionHypothesis
+    Hypothesis <|-- RegisteredAscription
+
+    SourceElement "1" -[#blue]-> "1..*" CandidateAscriptionHypothesis : derives
+    CandidateAscriptionHypothesis "1" -[#blue]-> "1" ValidatedCandidateAscriptionHypothesis : promotes
+    ValidatedCandidateAscriptionHypothesis "1" -[#blue]-> "1" RegisteredAscription : promotes
+  }
+
+  package "Slot value types" {
+    enum GsmSubjectKind {
+      Structure
+      Mechanism
+      Effector
+      Receptor
+      Interaction
+      Archetype
+      Directive
+      Norm
+    }
+
+    class GranularityVerdict {
+      +kind : enum { keep, drop, splitInto, mergeWith }
+      +targetIds : List<HypothesisId>
+      +rationale : String
+    }
+
+    class Evidence {
+      +source : String
+      +signal : String
+      +weight : Float
+      +rationale : String
+    }
+
+    class Confidence {
+      +score : Float
+      +method : String
+      +supportingEvidence : List<HypothesisId>
+    }
+
+    class Diagnostic {
+      +severity : enum { info, warning, error, fatal }
+      +code : String
+      +message : String
+      +sourceKsId : KnowledgeSourceId?
+    }
+
+    class ValidationReport {
+      +ok : Boolean
+      +failures : List<SchemaFailure>
+    }
+  }
+}
+
+@enduml

@@ -1,0 +1,215 @@
+@startuml gsm-sourcer-ks-contract
+
+' ============================================================
+' VISUAL THEME
+' ============================================================
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 12
+skinparam ArrowColor #57606A
+skinparam DefaultFontName "SansSerif"
+skinparam backgroundColor #FFFFFF
+
+skinparam packageStyle rectangle
+skinparam packageBackgroundColor #F6F8FA
+skinparam packageBorderColor #57606A
+
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #57606A
+skinparam classFontColor #24292F
+
+skinparam noteBackgroundColor #FFF8C5
+skinparam noteBorderColor #57606A
+
+frame "CD - GSM Sourcer - Knowledge Source contract" {
+
+  note as ContractNote
+    **Knowledge Source (KS)** = a Java JAR shipped inside a Sourcing Pack.
+
+    A KS contributes to one or more Hypothesis slots on the Blackboard.
+    KSs NEVER:
+    - reference other KSs directly
+    - call DefMan, LLM providers, network, or filesystem outside ControlContext
+    - mutate posted hypotheses (post-only, monotonic)
+
+    KSs declare metadata in a `KnowledgeSourceDescriptor` so Control can
+    plan without invoking them.
+
+    **Validation Rules:**
+    - `id` MUST be a versioned `gsmarc://` URI (no implicit "latest").
+    - `writesLevel` MUST be in `{L0, L1}` (L2/L3 are engine-only).
+    - For every read level r in `readsLevels`: r <= writesLevel
+      (with the convention SourceContext < L0).
+    - Trigger predicate language is restricted to read-only structural
+      checks (field-presence, set-contains, equality) — no side effects,
+      no method calls.
+    - Sandboxing: classloader-scoped network egress denied; only
+      `ControlContext` services may call out.
+  end note
+
+  package "Knowledge Source" {
+
+    interface KnowledgeSource {
+      +descriptor() : KnowledgeSourceDescriptor
+      +contribute(trigger : Hypothesis, view : BlackboardView, ctx : ControlContext) : Contribution
+    }
+
+    class KnowledgeSourceDescriptor <<descriptor>> {
+      +id : KnowledgeSourceId
+      +family : KnowledgeSourceFamily
+      +readsLevels : Set<Level>
+      +writesLevel : Level
+      +writesSlots : Set<SlotName>
+      +triggerPredicate : TriggerPredicate
+      +dependsOn : Set<KnowledgeSourceId>
+      +parallelSafe : Boolean
+      +defmanExplorationNeeded : Boolean
+      +defmanReadScope : Set<ArchetypeUri>
+      +inferenceServiceNeeded : Boolean
+      +budget : ResourceBudget
+    }
+
+    enum KnowledgeSourceFamily {
+      DiscoveryKS
+      ArchetypingKS
+      StatementShapingKS
+      ReconciliationKS
+      GranularityKS
+      EvidenceCollectionKS
+      ConfidenceSynthesisKS
+    }
+
+    enum Level {
+      L0
+      L1
+      L2
+      L3
+    }
+
+    class TriggerPredicate <<DSL>> {
+      +expression : String
+    }
+    note right of TriggerPredicate
+      **Tiny declarative DSL** evaluated by Control.
+      Read-only, no side effects, no method calls.
+
+      Grammar (informal):
+        expr     := and | or | not | atom
+        atom     := levelEq | slotPresent | slotAbsent
+                  | setContains | equals
+        levelEq  := "level" "==" LevelLiteral
+        slotPresent  := SlotName "?"
+        slotAbsent   := "!" SlotName "?"
+        setContains  := SlotName ".contains(" Literal ")"
+        equals       := FieldPath "==" Literal
+
+      Examples:
+        level == L0
+        level == L1 && archetypeRefs? && !statement?
+        level == L1 && statement? && !granularityVerdict?
+        level == L1 && evidence.size > 0 && !confidence?
+    end note
+
+    class Contribution {
+      +kind : enum { POST, SKIP, DIAGNOSE }
+      +hypotheses : List<Hypothesis>
+      +determinism : enum { DETERMINISTIC, NON_DETERMINISTIC }
+      +cacheKey : CacheKey?
+      +diagnostics : List<Diagnostic>
+    }
+    note right of Contribution
+      **Determinism is per-contribution, not per-KS.**
+      A KS may emit DETERMINISTIC contributions in some
+      cases and NON_DETERMINISTIC in others.
+
+      `cacheKey` is MANDATORY when determinism is
+      NON_DETERMINISTIC. Used by InferenceService cache
+      and by re-derivation replay.
+    end note
+
+    class ResourceBudget {
+      +wallClockMs : Long
+      +memoryMb : Integer
+      +inferenceTokens : Long
+      +inferenceCostUsd : Float
+      +defmanCalls : Integer
+    }
+
+    KnowledgeSource ..> KnowledgeSourceDescriptor
+    KnowledgeSourceDescriptor *-- KnowledgeSourceFamily
+    KnowledgeSourceDescriptor *-- "1..*" Level : reads/writes
+    KnowledgeSourceDescriptor *-- TriggerPredicate
+    KnowledgeSourceDescriptor *-- ResourceBudget
+    KnowledgeSource ..> Contribution : returns
+  }
+
+  package "Engine surface (ControlContext)" {
+
+    interface ControlContext {
+      +runId() : RunId
+      +runConfig() : RunConfig
+      +blackboard() : BlackboardView
+      +snapshot() : SnapshotService
+      +archetypeResolver() : ArchetypeResolver
+      +inference() : InferenceService
+      +defmanExplore() : DefManExplorationService
+      +schemaValidator() : JsonSchemaValidator
+      +bundleStore() : BundleStoreView
+      +diagnose(d : Diagnostic) : void
+    }
+    note right of ControlContext
+      **Single API surface a KS sees.** Anything not on
+      this interface is unreachable from a KS classloader.
+
+      Egress and tenant scoping enforced inside services.
+    end note
+
+    interface BlackboardView <<read-only>> {
+      +query(q : Query) : Stream<Hypothesis>
+      +get(id : HypothesisId) : Hypothesis?
+      +post(level : Level, h : Hypothesis) : HypothesisId
+    }
+
+    interface DefManExplorationService <<read-only>> {
+      +navigateFrom(root : AscriptionUri, follow : Set<RelType>, depth : Int) : ExplorationResult
+      +searchByArchetype(a : ArchetypeUri, filter : Filter) : Page<AscriptionRef>
+      +describeAscription(uri : AscriptionUri) : AscriptionView
+    }
+    note right of DefManExplorationService
+      Read-only. Tenant-scoped by engine. Per-Run cache.
+      All responses captured in the BundleStore for replay.
+    end note
+
+    interface InferenceService {
+      +completeStatement(c : CandidateAscriptionHypothesis) : InferenceResult
+      +withTools(tools : Set<EngineTool>) : InferenceSession
+      +withPromptTemplate(t : PromptTemplate) : InferenceSession
+    }
+    note right of InferenceService
+      Default prompt is engine-derived from candidate
+      (archetypeSchema + provenance excerpt + neighbours).
+
+      A KS MAY override the prompt template.
+
+      A KS MAY register `EngineTool.DEFMAN_EXPLORATION`
+      so the LLM itself drives DefMan navigation via
+      function-calling. Engine still enforces tenant
+      scope and read-only.
+    end note
+
+    enum EngineTool {
+      DEFMAN_EXPLORATION
+      JSON_SCHEMA_LOOKUP
+      ARCHETYPE_RESOLUTION
+    }
+
+    ControlContext --> BlackboardView
+    ControlContext --> DefManExplorationService
+    ControlContext --> InferenceService
+    InferenceService --> EngineTool : may use
+  }
+
+  KnowledgeSource ..> ControlContext : uses
+}
+
+@enduml

@@ -1,0 +1,70 @@
+@startuml gsm-sourcer-overview
+
+' ============================================================
+' VISUAL THEME
+' ============================================================
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 12
+skinparam ArrowColor #57606A
+skinparam DefaultFontName "SansSerif"
+skinparam backgroundColor #FFFFFF
+
+skinparam packageStyle rectangle
+skinparam packageBackgroundColor #F6F8FA
+skinparam packageBorderColor #57606A
+skinparam componentBackgroundColor #FFFFFF
+skinparam componentBorderColor #57606A
+skinparam noteBackgroundColor #FFF8C5
+skinparam noteBorderColor #57606A
+
+frame "PD - GSM Sourcer - System overview (Blackboard pattern)" {
+
+  package "Engine (IT-domain agnostic)" as Eng {
+    component "Run Control" as RC
+    component "Plug-in Resolver" as PR
+    component "Control\n(scheduler)" as Ctrl
+    component "Blackboard\n(L0..L3)" as BB
+    component "Engine utilities\n(Snapshot, BundleStore,\nArchetypeResolver,\nJsonSchemaValidator,\nInferenceService,\nDefManExplorationService,\nDefManClient,\nRunLedger)" as Utils
+
+    RC --> PR
+    RC --> Ctrl
+    Ctrl --> BB
+    Ctrl --> Utils
+  }
+
+  package "Sourcing Packs (Java JARs)" as Packs {
+    component "ITIP GSM Sourcing Pack" as Itip
+    component "Other domain packs\n(legislation, regulatory, ...)" as Other
+  }
+
+  package "External" as Ext {
+    component "Source artifacts\n(opaque)" as Src
+    component "DefMan API" as DM
+    component "LLM provider" as LLM
+  }
+
+  PR --> Packs : load JARs\n(R3 today; R6 = DM-governed Definitions)
+  Packs ..> Ctrl : KSs fire via ControlContext
+
+  Utils --> Src : opaque snapshot
+  Utils --> DM : DRAFT + HATEOAS read
+  Utils --> LLM : completions (with tool wiring)
+
+  note bottom of Eng
+    Engine knows nothing about repositories,
+    languages, build systems, or frameworks.
+    Only `SourceContext` (opaque handle) and
+    `Hypothesis` (typed but content-opaque at L0).
+  end note
+
+  note bottom of Packs
+    Each Pack ships one or more Knowledge Sources
+    (KSs) of these families:
+    DiscoveryKS, ArchetypingKS, StatementShapingKS,
+    ReconciliationKS, GranularityKS,
+    EvidenceCollectionKS, ConfidenceSynthesisKS.
+  end note
+}
+
+@enduml

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/hypothesis/L1-CandidateAscriptionHypothesis/v1",
+  "title": "L1 CandidateAscriptionHypothesis",
+  "description": "Slot-filled, monotonic candidate Ascription. Slots are filled by different KS families. Slot writes MUST be monotonic; conflicts MUST fail-loud with a Diagnostic.",
+  "type": "object",
+  "required": ["id", "level", "subjectType", "archetypeRefs", "sourceIdentityKey", "derivedFrom", "contributors", "createdAt"],
+  "properties": {
+    "id": { "type": "string" },
+    "level": { "type": "string", "const": "L1" },
+    "subjectType": {
+      "type": "string",
+      "enum": ["Structure", "Mechanism", "Effector", "Receptor", "Interaction", "Archetype", "Directive", "Norm"],
+      "description": "GSM base primitive kind. Implied by the base Archetype URI in archetypeRefs and stored explicitly for fast filtering."
+    },
+    "archetypeRefs": {
+      "type": "array",
+      "items": { "type": "string", "format": "uri" },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Versioned Archetype URIs. MUST contain at least the base GSM primitive Archetype URI for subjectType. May accumulate framework-specific archetypes (TOGAF, ISO 25000, HTTP, etc.) as KSs contribute. Filled by ArchetypingKS."
+    },
+    "archetypeSchema": {
+      "type": "object",
+      "description": "Engine-resolved JSON Schema (allOf-expanded, $ref-resolved) corresponding to archetypeRefs. Set by Control (ArchetypeResolver), not by KSs.",
+      "additionalProperties": true
+    },
+    "statement": {
+      "type": "object",
+      "description": "Populated GSM statement, validated incrementally against archetypeSchema. Filled by StatementShapingKSs.",
+      "additionalProperties": true
+    },
+    "granularityVerdict": {
+      "type": "object",
+      "description": "Filled by GranularityKS (Axis-2 consolidation). Decision on this candidate after considering peers.",
+      "properties": {
+        "kind": { "type": "string", "enum": ["keep", "drop", "splitInto", "mergeWith"] },
+        "targetIds": { "type": "array", "items": { "type": "string" } },
+        "rationale": { "type": "string" }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "array",
+      "description": "Additive evidence items posted by EvidenceCollectionKSs. Consumed by ConfidenceSynthesisKS.",
+      "items": {
+        "type": "object",
+        "required": ["source", "signal", "weight"],
+        "properties": {
+          "source": { "type": "string" },
+          "signal": { "type": "string" },
+          "weight": { "type": "number" },
+          "rationale": { "type": "string" },
+          "contributor": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "confidence": {
+      "type": "object",
+      "description": "Single confidence value synthesized by ConfidenceSynthesisKS from evidence + diagnostics.",
+      "required": ["score", "method"],
+      "properties": {
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "method": { "type": "string" },
+        "supportingEvidence": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "sourceIdentityKey": {
+      "type": "string",
+      "description": "Inherited from the originating L0 SourceElement (or merged identity if Reconciliation merged multiple)."
+    },
+    "derivedFrom": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Engine-managed: lineage back to L0."
+    },
+    "contributors": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "gsmarc://gsm-sourcer/types/Diagnostic/v1" }
+    },
+    "createdAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

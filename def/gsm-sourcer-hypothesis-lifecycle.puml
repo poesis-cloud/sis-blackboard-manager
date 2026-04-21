@@ -1,0 +1,124 @@
+@startuml gsm-sourcer-hypothesis-lifecycle
+
+' ============================================================
+' VISUAL THEME
+' ============================================================
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 12
+skinparam ArrowColor #57606A
+skinparam DefaultFontName "SansSerif"
+skinparam backgroundColor #FFFFFF
+
+skinparam state {
+  BackgroundColor #FFFFFF
+  BorderColor #57606A
+  FontColor #24292F
+}
+
+skinparam noteBackgroundColor #FFF8C5
+skinparam noteBorderColor #57606A
+
+title GSM Sourcer - Hypothesis lifecycle and L1 slot fill
+
+note as Legend
+  **L0 -> L1 -> L2 -> L3** progression of a hypothesis.
+
+  L0 is absolute (mirror of source). L1 is monotonic
+  slot-filling. L2 / L3 are engine-only promotions.
+
+  The intake filter (Axis-1 profile) and the user
+  Checkpoint-A/B are gates on transitions, not phases.
+end note
+
+[*] --> L0_SourceElement : DiscoveryKS posts
+
+state "L0 SourceElement\n(absolute mirror)" as L0_SourceElement {
+}
+
+L0_SourceElement --> L1_Initial : Control admission filter\n(Axis-1 profile match)
+L0_SourceElement --> L0_Filtered : intake filter rejects\n(diagnostic recorded)
+
+state L0_Filtered <<end>>
+
+state "L1 CandidateAscriptionHypothesis" as L1 {
+  state "Initial\n(archetypeRefs empty)" as L1_Initial
+  state "Archetyped\n(archetypeRefs + archetypeSchema set)" as L1_Archetyped
+  state "Shaped\n(statement filled)" as L1_Shaped
+  state "Consolidated\n(granularityVerdict set)" as L1_Consolidated
+  state "Evidenced\n(evidence[] non-empty)" as L1_Evidenced
+  state "Confidenced\n(confidence set)" as L1_Confidenced
+  state "Ready\n(all required slots filled)" as L1_Ready
+
+  L1_Initial --> L1_Archetyped : ArchetypingKS
+  L1_Archetyped --> L1_Shaped : StatementShapingKS
+  L1_Shaped --> L1_Consolidated : GranularityKS\n(optional;\nengine default = keep)
+  L1_Shaped --> L1_Evidenced : EvidenceCollectionKS\n(optional)
+  L1_Evidenced --> L1_Confidenced : ConfidenceSynthesisKS\n(optional)
+  L1_Consolidated --> L1_Ready
+  L1_Shaped --> L1_Ready : if no Granularity/\nCorroboration KS active
+  L1_Confidenced --> L1_Ready
+}
+
+L1_Ready --> CheckpointA : Control awaits user
+
+state "Checkpoint-A\n(user-mediated)" as CheckpointA {
+  state "Awaiting review" as CA_Wait
+  state "Approved" as CA_Approved
+  state "Override applied" as CA_Override
+  state "Rejected (drop)" as CA_Rejected
+  CA_Wait --> CA_Approved : user: approve
+  CA_Wait --> CA_Override : user: patch slot
+  CA_Wait --> CA_Rejected : user: drop
+}
+
+CheckpointA --> L2_Validated : approved
+CheckpointA --> L1_Initial : override -> re-fire dependent KSs
+CheckpointA --> L0_Filtered : rejected
+
+state "L2 ValidatedCandidateAscriptionHypothesis" as L2_Validated {
+}
+
+L1_Ready --> L2_Validated : Control validates statement\nagainst archetypeSchema
+L2_Validated --> L1_Initial : validation failure\n-> diagnostic, may re-shape
+
+L2_Validated --> CheckpointB : Control awaits user
+
+state "Checkpoint-B\n(user-mediated)" as CheckpointB {
+  state "Awaiting review" as CB_Wait
+  state "Approved" as CB_Approved
+  state "Override applied" as CB_Override
+  state "Rejected (drop)" as CB_Rejected
+  CB_Wait --> CB_Approved : user: approve
+  CB_Wait --> CB_Override : user: patch slot
+  CB_Wait --> CB_Rejected : user: drop
+}
+
+CheckpointB --> L3_Registered : approved
+CheckpointB --> L1_Initial : override -> re-fire dependent KSs
+CheckpointB --> L0_Filtered : rejected
+
+state "L3 RegisteredAscription\n(DRAFT in DefMan)" as L3_Registered
+
+L3_Registered --> [*]
+
+note right of L1
+  **Slot fill is monotonic.** Once a slot is filled by a KS,
+  no other KS can overwrite it (slot-conflict policy:
+  fail-loud + diagnostic). Only user override at
+  Checkpoint-A/B can replace a slot value.
+
+  Override-cascade: if user patches slot S on hypothesis H,
+  Control walks `derivedFrom` and invalidates every
+  hypothesis transitively dependent on S, then re-fires
+  triggers.
+end note
+
+note right of CheckpointA
+  Checkpoints are **engine capabilities**, not KS concerns.
+  Two Checkpoints by default; configurable per Run
+  (skipped, or additional ones inserted between specific
+  KS families).
+end note
+
+@enduml

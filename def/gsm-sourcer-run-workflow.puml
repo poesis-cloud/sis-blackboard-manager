@@ -1,0 +1,187 @@
+@startuml gsm-sourcer-run-workflow
+
+' ============================================================
+' VISUAL THEME
+' ============================================================
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam ArrowColor #57606A
+skinparam DefaultFontName "SansSerif"
+skinparam backgroundColor #FFFFFF
+
+skinparam sequence {
+  ParticipantBackgroundColor #FFFFFF
+  ParticipantBorderColor #57606A
+  ParticipantFontColor #24292F
+  ActorBackgroundColor #FFFFFF
+  ActorBorderColor #57606A
+  LifeLineBorderColor #57606A
+  GroupBackgroundColor #F6F8FA
+  GroupBorderColor #57606A
+}
+
+skinparam noteBackgroundColor #FFF8C5
+skinparam noteBorderColor #57606A
+
+title GSM Sourcer - End-to-end Run workflow
+
+actor "Run Operator" as Op
+actor "Reviewer" as Rev
+
+participant "Run Control\n(REST API)" as RC
+participant "Plug-in Resolver" as PR
+participant "Control\n(scheduler)" as Ctrl
+participant "Blackboard" as BB
+participant "BundleStore" as BS
+participant "RunLedger" as RL
+participant "Snapshot\nutility" as Snap
+participant "ArchetypeResolver" as AR
+participant "Sandboxed KSs\n(per Pack)" as KSs
+participant "InferenceService" as Inf
+participant "DefManExploration\nService" as DefExp
+participant "JsonSchema\nValidator" as JV
+participant "DefManClient" as DM
+
+== Run start ==
+
+Op -> RC : POST /runs RunRequest\n{sourceContext, packs[], profile, targetCatalogues[]}
+RC -> PR : resolve packs (URIs+versions)
+PR -> RC : KS classloaders ready
+RC -> Ctrl : startRun(runId, config)
+Ctrl -> RL : record Run START
+Ctrl -> BB : open empty Blackboard
+Ctrl -> Snap : snapshot(sourceContext)
+Snap -> BS : store opaque bytes\n(content-addressable)
+Snap --> Ctrl : SourceContextSnapshot
+
+== L0 Discovery ==
+
+Ctrl -> KSs : fire DiscoveryKSs\n(trigger: SourceContext available)
+KSs -> KSs : parse, walk, etc.\n(KS-internal)
+KSs -> BB : post L0 SourceElements
+note over Ctrl, BB
+  L0 is ABSOLUTE: no filtering.
+  Reproducibility ground truth.
+end note
+
+== L0 -> L1 promotion (intake filter) ==
+
+loop for each L0 SourceElement
+  Ctrl -> Ctrl : evaluate Axis-1 profile\nagainst signals
+  alt profile match
+    Ctrl -> BB : post L1 Initial CandidateAscriptionHypothesis\n(empty slots)
+  else profile reject
+    Ctrl -> RL : diagnostic (intake filter rejected)
+  end
+end
+
+== L1 Archetyping ==
+
+Ctrl -> KSs : fire ArchetypingKSs\n(trigger: L1 && !archetypeRefs?)
+KSs -> BB : query L0 + L1 lineage
+KSs -> DefExp : (optional) navigateFrom existing siblings
+DefExp --> KSs : ExplorationResult
+KSs -> BB : post archetypeRefs slot
+Ctrl -> AR : resolve schema(refs)
+AR --> Ctrl : ResolvedJsonSchema (allOf-expanded)
+Ctrl -> BB : post archetypeSchema slot
+
+== L1 StatementShaping ==
+
+Ctrl -> KSs : fire StatementShapingKSs\n(trigger: L1 && archetypeRefs? && !statement?)
+KSs -> BB : read archetypeSchema + L0 contentRef
+
+alt LLM-driven shaping
+  KSs -> Inf : completeStatement(c)\nwithTools({DEFMAN_EXPLORATION})
+  loop function-calling
+    Inf -> DefExp : tool call (LLM-issued)
+    DefExp --> Inf : result (cached per Run)
+  end
+  Inf --> KSs : InferenceResult\n(NON_DETERMINISTIC + cacheKey)
+else deterministic shaping
+  KSs -> KSs : structural extraction
+end
+
+KSs -> JV : incremental validation\n(partial statement vs schema)
+JV --> KSs : OK | failures
+KSs -> BB : post statement slot\n(or diagnostic on failure)
+
+== L1 enrichment slots (parallel where parallelSafe) ==
+
+par GranularityKS (Axis-2 consolidation)
+  Ctrl -> KSs : fire (trigger: L1 && statement? && !granularityVerdict?)
+  KSs -> BB : read peer L1 candidates\nin same Structure
+  KSs -> BB : post granularityVerdict slot
+also EvidenceCollectionKSs (additive)
+  Ctrl -> KSs : fire (trigger: L1 && statement?)
+  KSs -> BB : post evidence slot (additive)
+end
+
+opt heuristic profile active
+  Ctrl -> KSs : fire ConfidenceSynthesisKS\n(trigger: L1 && evidence.size > 0 && !confidence?)
+  KSs -> BB : read evidence + diagnostics
+  KSs -> BB : post confidence slot
+end
+
+== Reconciliation ==
+
+opt overlapping discoveries
+  Ctrl -> KSs : fire ReconciliationKSs\n(trigger: 2+ L1 with same sourceIdentityKey)
+  KSs -> BB : merge candidates\n(union archetypeRefs, etc.)
+end
+
+== Checkpoint-A ==
+
+Ctrl -> BS : snapshot Blackboard (Stage-A)
+Ctrl -> RL : record CHECKPOINT_A_PENDING
+
+alt synchronous Run
+  Rev -> RC : GET /runs/{id}/blackboard
+  RC --> Rev : Stage-A snapshot
+  Rev -> RC : POST /runs/{id}/checkpoint approve | override | reject
+  alt approve
+    RC -> Ctrl : resume
+  else override
+    RC -> Ctrl : patch slot S on H
+    Ctrl -> BB : invalidate dependent hypotheses\n(walk derivedFrom)
+    Ctrl -> KSs : re-fire affected triggers
+  else reject
+    RC -> Ctrl : drop H + dependents
+  end
+else asynchronous Run
+  Ctrl -> RC : status = AWAITING_REVIEW (returns)
+end
+
+== L1 -> L2 Validation (engine-only) ==
+
+loop for each L1 Ready
+  Ctrl -> JV : validate statement vs archetypeSchema (full)
+  alt OK
+    Ctrl -> BB : post L2 ValidatedCandidateAscriptionHypothesis
+  else failed
+    Ctrl -> BB : add diagnostic
+    Ctrl -> KSs : re-fire StatementShapingKSs (capped retries)
+  end
+end
+
+== Checkpoint-B ==
+
+Ctrl -> BS : snapshot Blackboard (Stage-B)
+Ctrl -> RL : record CHECKPOINT_B_PENDING
+Rev -> RC : approve | override | reject (same protocol)
+
+== L2 -> L3 Registration (engine-only) ==
+
+loop for each L2 approved
+  Ctrl -> DM : POST /ascriptions DRAFT
+  DM --> Ctrl : AscriptionUri
+  Ctrl -> BB : post L3 RegisteredAscription
+end
+
+== Run end ==
+
+Ctrl -> BS : final Blackboard snapshot
+Ctrl -> RL : record Run END (success | partial | failed)
+RC --> Op : RunResult\n{registeredCount, diagnostics, bundleRef, ledgerRef}
+
+@enduml

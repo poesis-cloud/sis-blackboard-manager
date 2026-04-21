@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/ks-descriptor/v1",
+  "title": "KnowledgeSourceDescriptor",
+  "description": "Declarative metadata for a Knowledge Source (KS). Loaded by Control without invoking the KS.",
+  "type": "object",
+  "required": ["id", "family", "writesLevel", "readsLevels", "triggerPredicate", "determinismDefault", "parallelSafe"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uri",
+      "description": "Versioned gsmarc:// URI. No implicit 'latest'."
+    },
+    "family": {
+      "type": "string",
+      "enum": [
+        "DiscoveryKS",
+        "ArchetypingKS",
+        "StatementShapingKS",
+        "ReconciliationKS",
+        "GranularityKS",
+        "EvidenceCollectionKS",
+        "ConfidenceSynthesisKS"
+      ]
+    },
+    "writesLevel": {
+      "type": "string",
+      "enum": ["L0", "L1"],
+      "description": "L2 and L3 are engine-only."
+    },
+    "writesSlots": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Slot names this KS writes (only meaningful for L1 KSs)."
+    },
+    "readsLevels": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["SOURCE_CONTEXT", "L0", "L1", "L2"] },
+      "uniqueItems": true,
+      "description": "Levels this KS reads. Invariant: every read level <= writesLevel (with SOURCE_CONTEXT < L0)."
+    },
+    "triggerPredicate": {
+      "type": "string",
+      "description": "Tiny declarative DSL evaluated by Control. Read-only structural checks; no side effects, no method calls. Example: 'level == L1 && archetypeRefs? && !statement?'"
+    },
+    "dependsOn": {
+      "type": "array",
+      "items": { "type": "string", "format": "uri" },
+      "uniqueItems": true,
+      "description": "Explicit upstream KS dependencies. Control will not fire this KS for a hypothesis lineage until all dependsOn KSs have either contributed or declared SKIP."
+    },
+    "determinismDefault": {
+      "type": "string",
+      "enum": ["DETERMINISTIC", "NON_DETERMINISTIC"],
+      "description": "Default determinism class. Per-Contribution overrides allowed (a KS may emit DETERMINISTIC and NON_DETERMINISTIC contributions)."
+    },
+    "parallelSafe": {
+      "type": "boolean",
+      "description": "If true, Control may invoke this KS in parallel with other parallelSafe KSs whose read/write sets do not overlap on the same hypothesis."
+    },
+    "defmanExplorationNeeded": { "type": "boolean", "default": false },
+    "defmanReadScope": {
+      "type": "array",
+      "items": { "type": "string", "format": "uri" },
+      "description": "If defmanExplorationNeeded, the engine restricts DefManExplorationService to these archetype URIs."
+    },
+    "inferenceServiceNeeded": { "type": "boolean", "default": false },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "wallClockMs": { "type": "integer", "minimum": 0 },
+        "memoryMb": { "type": "integer", "minimum": 0 },
+        "inferenceTokens": { "type": "integer", "minimum": 0 },
+        "inferenceCostUsd": { "type": "number", "minimum": 0 },
+        "defmanCalls": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "implementationClass": {
+      "type": "string",
+      "description": "Fully-qualified Java class name implementing the KnowledgeSource interface."
+    }
+  },
+  "additionalProperties": false
+}

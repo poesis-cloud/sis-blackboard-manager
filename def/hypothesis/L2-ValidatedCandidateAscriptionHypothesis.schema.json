@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/hypothesis/L2-ValidatedCandidateAscriptionHypothesis/v1",
+  "title": "L2 ValidatedCandidateAscriptionHypothesis",
+  "description": "Engine-only promotion: a CandidateAscriptionHypothesis whose statement validates against its full archetypeSchema (allOf-expanded).",
+  "type": "object",
+  "required": ["id", "level", "candidateId", "validationReport", "derivedFrom", "contributors", "createdAt"],
+  "properties": {
+    "id": { "type": "string" },
+    "level": { "type": "string", "const": "L2" },
+    "candidateId": {
+      "type": "string",
+      "description": "Reference to the source L1 hypothesis."
+    },
+    "validationReport": {
+      "type": "object",
+      "required": ["ok"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "failures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["pointer", "message"],
+            "properties": {
+              "pointer": { "type": "string" },
+              "message": { "type": "string" },
+              "schemaPath": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "derivedFrom": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "contributors": { "type": "array", "items": { "type": "string" } },
+    "diagnostics": { "type": "array", "items": { "$ref": "gsmarc://gsm-sourcer/types/Diagnostic/v1" } },
+    "createdAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

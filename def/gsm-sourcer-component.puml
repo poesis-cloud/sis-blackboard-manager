@@ -1,0 +1,133 @@
+@startuml gsm-sourcer-component
+
+' ============================================================
+' VISUAL THEME
+' ============================================================
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 12
+skinparam ArrowColor #57606A
+skinparam DefaultFontName "SansSerif"
+skinparam backgroundColor #FFFFFF
+
+skinparam packageStyle rectangle
+skinparam packageBackgroundColor #F6F8FA
+skinparam packageBorderColor #57606A
+
+skinparam componentBackgroundColor #FFFFFF
+skinparam componentBorderColor #57606A
+skinparam componentFontColor #24292F
+
+skinparam interfaceBackgroundColor #FFFFFF
+skinparam interfaceBorderColor #57606A
+
+skinparam noteBackgroundColor #FFF8C5
+skinparam noteBorderColor #57606A
+
+frame "PD - GSM Sourcer - Component architecture" {
+
+  note as ArchNote
+    **Engine is IT-domain agnostic.** No knowledge of git, Maven,
+    Spring, OpenAPI, languages, build systems, or repositories
+    inside Control or any engine utility.
+
+    All IT-domain knowledge is shipped in **Sourcing Packs**
+    (e.g. ITIP GSM Sourcing Pack). A Sourcing Pack contributes
+    Knowledge Sources (KSs) that load in their own classloader
+    with network egress denied.
+
+    The only API surface a KS sees is `ControlContext`.
+  end note
+
+  package "GSM Sourcer engine" as Engine {
+
+    component "Run Control\n(REST API)" as RunControl
+
+    component "Plug-in Resolver\n(R3 -> R3.5 -> R6)" as PackResolver
+    note right of PackResolver
+      **R3 (now)**: RunRequest carries explicit Pack URIs
+      with versions. No implicit "latest".
+      **R3.5**: per-environment pluginCatalog Ascription.
+      **R6 (end-state)**: Pack URIs resolve to
+      DM-governed Plug-in Definitions.
+    end note
+
+    component "Control\n(scheduler + lifecycle)" as Control
+
+    package "Engine utilities" as Utils {
+      component "Snapshot" as Snapshot
+      component "BundleStore\n(object storage)" as BundleStore
+      component "ArchetypeResolver" as ArchetypeResolver
+      component "JsonSchemaValidator" as Validator
+      component "InferenceService\n(LLM client +\nprompt assembly +\ntool routing +\ncost ledger)" as Inference
+      component "DefManExplorationService\n(read-only +\ntenant-scoped +\nper-Run cache)" as DefManExplore
+      component "DefManClient\n(write: Registration only)" as DefManClient
+      component "RunLedger (PG)" as RunLedger
+    }
+
+    component "Blackboard\n(L0..L3 hypotheses)" as Blackboard
+
+    package "Sandbox" as Sandbox {
+      component "KS classloader 1" as CL1
+      component "KS classloader 2" as CL2
+      component "KS classloader N" as CLN
+    }
+
+    interface "ControlContext" as CCtx
+
+    RunControl --> PackResolver : load packs
+    RunControl --> Control : start Run
+    Control --> Sandbox : fire KSs
+    Control --> Blackboard : post / read
+    Control --> Snapshot
+    Control --> BundleStore : checkpoint
+    Control --> ArchetypeResolver
+    Control --> Validator : L1 -> L2
+    Control --> DefManClient : L2 -> L3
+    Control --> RunLedger : audit
+    Control --> Inference : tool wiring
+    Control --> DefManExplore : tool wiring
+
+    Sandbox -( CCtx
+    CCtx -- Blackboard
+    CCtx -- Snapshot
+    CCtx -- ArchetypeResolver
+    CCtx -- Validator
+    CCtx -- Inference
+    CCtx -- DefManExplore
+    CCtx -- BundleStore : read-only
+
+    Inference --> DefManExplore : tool (function-calling)
+  }
+
+  package "Sourcing Packs (external)" as Packs {
+    component "ITIP GSM Sourcing Pack\n(Java JARs)" as ItipPack
+    component "Other domain packs\n(legislation, regulatory, ...)" as OtherPacks
+  }
+
+  PackResolver --> Packs : loads JARs
+  ItipPack ..> CL1 : provides KSs
+  OtherPacks ..> CL2 : provides KSs
+
+  package "External systems" as External {
+    component "DefMan API\n(SIE Definition Manager)" as DefMan
+    component "LLM provider(s)\n(OpenAI / Anthropic / local)" as LlmProvider
+    component "Source artifacts\n(opaque to engine)" as Source
+  }
+
+  DefManClient --> DefMan : DRAFT submission
+  DefManExplore --> DefMan : HATEOAS read
+  Inference --> LlmProvider : completions
+  Snapshot --> Source : opaque snapshot
+
+  note bottom of Sandbox
+    **Sandboxing rules:**
+    - Each pack loaded in its own classloader.
+    - Pack JARs scanned at load (jdeps): forbidden packages rejected
+      (okhttp, apache.http, java.net.Socket usage outside ControlContext, ...).
+    - Network egress denied at pack-classloader scope.
+    - LLM and DefMan calls only via ControlContext services.
+  end note
+}
+
+@enduml
