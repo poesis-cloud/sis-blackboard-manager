@@ -102,6 +102,10 @@
             "strict",
             "lenient"
           ]
+        },
+        "completionPredicate": {
+          "type": "string",
+          "description": "Optional 'satisfactory solution' stop criterion in the trigger DSL. Frozen from RunConfig."
         }
       },
       "additionalProperties": false
@@ -116,7 +120,8 @@
           "firstWriter",
           "failOnConflict",
           "userMediated",
-          "collectAll"
+          "collectAll",
+          "compose"
         ]
       }
     },

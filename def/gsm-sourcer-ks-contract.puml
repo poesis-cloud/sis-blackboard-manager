@@ -113,8 +113,8 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
 
   note as N_DSL
     **triggerPredicate DSL (read-only structural)**
-    Operators: ==, &&, ||, !, .size
-    Predicates:
+    Operators: ==, !=, <, >, <=, >=, &&, ||, !, .size
+    Per-identity predicates:
       panel == <Panel>
       slot  == <Slot>
       resolved(<Panel>, identity)
@@ -123,6 +123,13 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
       !contributedBy(self, identity)
       evidence(identity).size > N
       runContext.scope.includes(identity)
+    Revision predicates (re-fire even when
+    upstream slot is already resolved):
+      confidenceBelow(identity, threshold)
+      statementAmbiguous(identity)
+      validationFailed(identity)
+    Aggregate (cross-identity) predicates:
+      count(<per-identity-predicate>) <op> N
 
     Examples:
       panel == SourceInterface || panel == SourceUnit
@@ -133,6 +140,9 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
         && runContext.scope.includes(identity)
       panel == Confidence && resolved(Statement, identity)
         && evidence(identity).size > 0
+      panel == Confidence && confidenceBelow(identity, 0.5)
+      count(panel == Definition
+        && !resolved(Archetype, identity)) > 5
   end note
 
   note as N_Tools

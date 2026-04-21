@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/Granularity/v1",
   "title": "GranularityValue",
-  "description": "Value posted onto the Granularity panel (engine-owned, GSM-spine): consolidation verdict per Definition.",
+  "description": "Value posted onto the Granularity panel (engine-owned, GSM-spine): consolidation verdict per Definition. Distinct from Definition.Merge: Granularity runs AFTER Statement shaping, so its mergeWith verdict is informed by the populated GSM statement and takes precedence over any earlier identity-time Definition.Merge for the same identity (Override Cascader supersedes the earlier Merge).",
   "type": "object",
   "required": [
     "slot",

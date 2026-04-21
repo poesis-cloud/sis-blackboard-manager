@@ -74,7 +74,7 @@
     },
     "triggerPredicate": {
       "type": "string",
-      "description": "Tiny declarative DSL over Blackboard state. Operators: ==, &&, ||, !, .size. Predicates: panel == <Panel>, slot == <Slot>, resolved(<Panel>, identity), contributedBy(self, identity), evidence(identity).size > N, runContext.scope.includes(identity)."
+      "description": "Tiny declarative DSL over Blackboard state + runContext. Operators: ==, !=, <, >, <=, >=, &&, ||, !, .size. Per-identity predicates: panel == <Panel>, slot == <Slot>, resolved(<Panel>, identity), contributedBy(self, identity), evidence(identity).size > N, runContext.scope.includes(identity). Revision predicates (enable opportunistic / top-down re-firing even when the nominal upstream slot is already resolved): confidenceBelow(identity, threshold), statementAmbiguous(identity), validationFailed(identity). Aggregate (cross-identity) predicates: count(<per-identity-predicate>) <op> N. Examples: `count(panel == Definition && !resolved(Archetype, identity)) > 5`, `panel == Confidence && confidenceBelow(identity, 0.5)`."
     },
     "appliesToInterpretationKinds": {
       "type": "array",
@@ -101,9 +101,10 @@
         "firstWriter",
         "failOnConflict",
         "userMediated",
-        "collectAll"
+        "collectAll",
+        "compose"
       ],
-      "description": "Recommended ContributionResolver for the writesPanel; RunConfig may override."
+      "description": "Recommended ContributionResolver for the writesPanel; RunConfig may override. `compose` = schema-driven per-key merging of value objects (engine merge function over the resolved JSON Schema); use it for panels whose value carries independent fields contributed by multiple KSs (e.g. Statement)."
     },
     "inferenceServiceNeeded": {
       "type": "boolean",
@@ -141,6 +142,7 @@
     },
     "budget": {
       "type": "object",
+      "description": "Per-tick budget caps. Engine enforces by cooperative cancellation at the next ControlContext call (.post / .resolved / .tool / .inference / .defman). On hard limit (e.g. wallClockMs reached during a blocking syscall), the engine cancels execve, drops the KS's pending posts in this tick, posts a Diagnostic, and re-enqueues the KS for the next tick (capped retries via RunConfig.ksBudgetOverrides).",
       "properties": {
         "wallClockMs": {
           "type": "integer",

@@ -61,9 +61,20 @@ end
 
 Init -> RL : record Run START
 
+== Checkpoint-0 (governance overlay; optional, post-Initialization) ==
+
+alt runConfig.checkpoints.0 = true
+  Init -> RL : record CHECKPOINT_0_PENDING
+  Rev -> API : GET /runs/{id}/runContext
+  Rev -> API : POST /runs/{id}/checkpoint-0/{approve|reject}
+  alt rejected
+    API -> Ctrl : abort
+  end
+end
+
 == Activation + Execution + Conflict Resolution + Iteration (canonical loop) ==
 
-loop until quiescence OR maxIterations
+loop until quiescence OR maxIterations OR completionPredicate
 
   ' --- Activation: Control selects eligible KSs based on current Blackboard state ---
   Ctrl -> BB : query state

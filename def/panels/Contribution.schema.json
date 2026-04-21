@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/Contribution/v1",
   "title": "Contribution",
-  "description": "Generic Blackboard contribution wrapper. Engine attaches id / contributorKsId / derivedFrom / createdAt / supersedes. KSs cannot fabricate them.",
+  "description": "Generic Blackboard contribution wrapper. Engine attaches id / contributorKsId / kind / derivedFrom / createdAt / supersedes. KSs cannot fabricate them.",
   "type": "object",
   "required": [
     "id",
@@ -10,6 +10,7 @@
     "slot",
     "value",
     "contributorKsId",
+    "kind",
     "determinism",
     "createdAt"
   ],
@@ -49,7 +50,20 @@
     },
     "contributorKsId": {
       "type": "string",
-      "description": "Versioned gsmarc:// URI of the producing KS or 'gsmarc://gsm-sourcer/user/v1' for user-mediated overrides."
+      "description": "Versioned gsmarc:// URI of the producing KS, of the Pack's Instructions Provider, or of the user-mediated override channel."
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "KS_DERIVED",
+        "INSTRUCTIONS_DERIVED",
+        "USER_OVERRIDE"
+      ],
+      "description": "Provenance class of the contribution. KS_DERIVED = posted by a KS via execve; INSTRUCTIONS_DERIVED = posted by the Initializer from the Instructions Provider's payload before Control starts; USER_OVERRIDE = posted by a Reviewer at a Checkpoint (requires checkpointId)."
+    },
+    "checkpointId": {
+      "type": "string",
+      "description": "Required when kind = USER_OVERRIDE. Identifies the suspended Checkpoint at which the Reviewer authored the override."
     },
     "confidence": {
       "type": "number",
@@ -108,6 +122,23 @@
       "then": {
         "required": [
           "cacheKey"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "USER_OVERRIDE"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "checkpointId"
         ]
       }
     }

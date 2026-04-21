@@ -47,6 +47,7 @@
     },
     "resolverOverrides": {
       "type": "object",
+      "description": "Per-panel resolver overrides keyed by panel name. `compose` performs schema-driven per-key merging of value objects (engine merge function over the resolved JSON Schema); use it for panels whose value carries independent fields contributed by multiple KSs (e.g. Statement).",
       "additionalProperties": {
         "type": "string",
         "enum": [
@@ -54,7 +55,8 @@
           "firstWriter",
           "failOnConflict",
           "userMediated",
-          "collectAll"
+          "collectAll",
+          "compose"
         ]
       }
     },
@@ -102,13 +104,23 @@
             "lenient"
           ],
           "default": "lenient"
+        },
+        "completionPredicate": {
+          "type": "string",
+          "description": "Optional 'satisfactory solution' stop criterion expressed in the trigger DSL (read-only over Blackboard state + runContext). When it evaluates true, Control short-circuits the Iteration loop even before quiescence. Example: `count(panel == Definition && !resolved(Confidence, identity)) == 0 && count(panel == Confidence && score < 0.5) == 0`."
         }
       },
       "additionalProperties": false
     },
     "checkpoints": {
       "type": "object",
+      "description": "Governance overlay checkpoints. Checkpoint-0 (post-Initialization) lets a Reviewer approve SourcingRunContext (scope/focus/profile) before any KS runs. A (post-convergence) and B (post-validation) suspend the Run for review/override/reject.",
       "properties": {
+        "0": {
+          "type": "boolean",
+          "default": false,
+          "description": "Suspend after Initialization for SourcingRunContext approval before Control begins."
+        },
         "A": {
           "type": "boolean",
           "default": false

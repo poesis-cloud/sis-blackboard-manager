@@ -113,7 +113,8 @@
               "firstWriter",
               "failOnConflict",
               "userMediated",
-              "collectAll"
+              "collectAll",
+              "compose"
             ]
           },
           "rationale": {

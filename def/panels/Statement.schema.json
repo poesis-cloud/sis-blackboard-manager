@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/Statement/v1",
   "title": "StatementValue",
-  "description": "Value posted onto the Statement panel (engine-owned, GSM-spine): populated GSM statement payload conforming to the resolved archetype JSON Schema.",
+  "description": "Value posted onto the Statement panel (engine-owned, GSM-spine): populated GSM statement payload conforming to the resolved archetype JSON Schema. Default ContributionResolver = `compose`: per-key merge of the inner `statement` object across competing contributions, so multiple StatementShapingKSs can populate disjoint archetype fields cooperatively (each KS posts a partial statement; engine assembles the union).",
   "type": "object",
   "required": [
     "slot",
