@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/panels/SourceRelation/v1",
+  "title": "SourceRelationValue",
+  "description": "Value posted onto the SourceRelation panel: typed edges between SourceUnit / SourceInterface entries. Pack-owned. Examples used by the Repository Sourcing Pack: SymbolRef, TypeHierarchyEdge, ImplementationEdge, ImportEdge, CallEdge, DataflowEdge, DeploymentEdge.",
+  "type": "object",
+  "required": [
+    "slot",
+    "fromKey",
+    "toKey"
+  ],
+  "properties": {
+    "slot": {
+      "type": "string"
+    },
+    "fromKey": {
+      "type": "string"
+    },
+    "toKey": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

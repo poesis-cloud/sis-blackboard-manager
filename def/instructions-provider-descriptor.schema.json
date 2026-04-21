@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/instructions-provider-descriptor/v1",
+  "title": "InstructionsProviderDescriptor",
+  "description": "Descriptor for a Pack-shipped Instructions Provider plug-in. Invoked exactly once per Run by the Initializer, before Control starts. Returns domain-specific RunContext properties (instructionsPayload + Pack-typed user config). Never writes to the Blackboard. Same sandboxing/versioning model as KSs but distinct contract.",
+  "type": "object",
+  "required": [
+    "id",
+    "instructionsPayloadSchemaRef"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "instructionsPayloadSchemaRef": {
+      "type": "string",
+      "description": "Versioned gsmarc:// URI of the JSON Schema that the returned instructionsPayload conforms to. Pack-owned schema."
+    },
+    "network": {
+      "type": "string",
+      "enum": [
+        "deny",
+        "allow"
+      ],
+      "default": "deny"
+    },
+    "externalTools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "versionSpec"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "versionSpec": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "wallClockMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "memoryMb": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

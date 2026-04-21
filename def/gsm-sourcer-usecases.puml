@@ -27,30 +27,30 @@ frame "UC - GSM Sourcer" {
 
   actor "Run Operator" as Op
   actor "Reviewer\n(checkpoint)" as Rev
-  actor "KS Author\n(Sourcing Pack)" as Author
-  actor "Auditor /\nCompliance" as Aud
+  actor "Pack Author" as Author
+  actor "Auditor" as Aud
   actor "DefMan\n(downstream)" as DM
   actor "LLM Provider\n(external)" as LLM
 
   package "Run lifecycle" {
-    usecase "Submit Run\n(sourceContext + packs +\nprofile + targetCatalogues +\ncontributionResolvers)" as UC_Submit
+    usecase "Submit Run\n(RunConfig: packs, profile,\ninstructionsPayload, tool bindings,\nresolver overrides, invariants)" as UC_Submit
     usecase "Monitor Run progress\n(per-panel contribution counts)" as UC_Monitor
-    usecase "Inspect Blackboard at\nCheckpoint-A / Checkpoint-B\n(see competing contributions)" as UC_Inspect
+    usecase "Inspect Blackboard at\nCheckpoint-A / Checkpoint-B" as UC_Inspect
     usecase "Approve / Override /\nReject at Checkpoint" as UC_Decide
     usecase "Cancel Run" as UC_Cancel
   }
 
   package "Audit & replay" {
-    usecase "Snapshot replay\n(view past Blackboard +\nresolver decisions)" as UC_Snap
+    usecase "Snapshot replay\n(past Blackboard +\nresolver decisions)" as UC_Snap
     usecase "Re-derivation replay\n(with cached inference)" as UC_Rederiv
     usecase "Drift detection\n(re-source same input)" as UC_Drift
-    usecase "Trace contribution\n(provenance / contributors /\nsupersession chain)" as UC_Trace
+    usecase "Trace contribution\n(provenance, supersession chain)" as UC_Trace
   }
 
   package "Pack management" {
-    usecase "Author KS / Sourcing Pack" as UC_Author
-    usecase "Declare KS descriptor\n(panel, trigger, budgets,\nresolverHint)" as UC_Declare
-    usecase "Publish Sourcing Pack\n(versioned URI)" as UC_Publish
+    usecase "Author Sourcing Pack\n(Instructions Provider +\nsource-side panels +\nKSs)" as UC_Author
+    usecase "Declare KS descriptor\n(panel, slots, trigger,\nbudgets, resolverHint,\nexternalTools)" as UC_Declare
+    usecase "Publish Pack\n(versioned URI)" as UC_Publish
     usecase "Approve Pack\n(R6 end-state: as Definition)" as UC_Approve
   }
 
@@ -63,12 +63,10 @@ frame "UC - GSM Sourcer" {
   Op --> UC_Cancel
   Rev --> UC_Inspect
   Rev --> UC_Decide
-
   Aud --> UC_Snap
   Aud --> UC_Trace
   Aud --> UC_Rederiv
   Aud --> UC_Drift
-
   Author --> UC_Author
   Author --> UC_Declare
   Author --> UC_Publish
@@ -79,17 +77,20 @@ frame "UC - GSM Sourcer" {
   UC_Submit ..> LLM : optional\n(via InferenceService)
 
   note right of UC_Author
-    KS = Java JAR. KSs are unaware of each other.
-    No `dependsOn`; ordering via triggerPredicate
-    over Blackboard state only.
+    A Pack ships an Instructions Provider (Pack-typed
+    payload), source-side panel declarations
+    (name + value schema + slots + dependsOnPanels), and
+    KS descriptors. Pack also declares
+    requestedExternalTools[] (upper bound). All KSs are
+    Java JARs; KSs are unaware of each other.
   end note
 
   note right of UC_Snap
-    Snapshot replay is the PRIMARY guarantee:
-    past Blackboard + resolver decisions are stored,
-    so non-determinism does not break audit.
-    Re-derivation is best-effort with the per-Run
-    inference cache.
+    Snapshot replay is the PRIMARY audit guarantee:
+    past Blackboard + SourcingRunContext + resolver
+    decisions are stored, so non-determinism does not
+    break audit. Re-derivation is best-effort with the
+    per-Run inference cache.
   end note
 }
 

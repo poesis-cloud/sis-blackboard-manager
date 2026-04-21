@@ -2,61 +2,114 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/Contribution/v1",
   "title": "Contribution",
-  "description": "A typed value posted by a Knowledge Source onto a panel of the Blackboard. Multiple Contributions on the same (panel, subjectIdentityId, slot) coexist; Control resolves the effective value at read time using the configured ContributionResolver.",
+  "description": "Generic Blackboard contribution wrapper. Engine attaches id / contributorKsId / derivedFrom / createdAt / supersedes. KSs cannot fabricate them.",
   "type": "object",
-  "required": ["id", "panel", "subjectIdentityId", "slot", "value", "contributorKsId", "determinism", "createdAt"],
+  "required": [
+    "id",
+    "panel",
+    "slot",
+    "value",
+    "contributorKsId",
+    "determinism",
+    "createdAt"
+  ],
   "properties": {
-    "id": { "type": "string" },
+    "id": {
+      "type": "string"
+    },
     "panel": {
       "type": "string",
-      "enum": ["SourceInterpretation", "SubjectIdentity", "Archetyping", "Statement", "Granularity", "Evidence", "Confidence"]
-    },
-    "subjectIdentityId": {
-      "type": "string",
-      "description": "Reference to the SubjectIdentity contribution this contribution is about. Null only on SourceInterpretation contributions (which precede subject identification)."
+      "enum": [
+        "SourceInventory",
+        "SourceUnit",
+        "SourceRelation",
+        "SourceInterface",
+        "Definition",
+        "Archetype",
+        "Statement",
+        "Granularity",
+        "Evidence",
+        "Confidence"
+      ]
     },
     "slot": {
       "type": "string",
-      "description": "Panel-specific slot name (e.g. 'archetypeRefs', 'statement', 'verdict', 'evidenceItem', 'score'). See per-panel schemas."
+      "description": "Slot name within `panel` (one of the panel's closed contribution-type set)."
+    },
+    "targetIdentityKey": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Required for target-group panels (Archetype/Statement/Granularity/Evidence/Confidence) and for Definition Merge slots referencing prior identities. Null for source-group panels."
     },
     "value": {
-      "description": "Panel-specific value, validated against the panel schema for `slot`."
+      "type": "object",
+      "description": "Panel-specific value (validated against the panel's value schema)."
     },
     "contributorKsId": {
       "type": "string",
-      "format": "uri",
-      "description": "Versioned gsmarc:// URI of the Knowledge Source that posted this contribution. May be 'gsmarc://gsm-sourcer/user/v1' for user-mediated overrides."
+      "description": "Versioned gsmarc:// URI of the producing KS or 'gsmarc://gsm-sourcer/user/v1' for user-mediated overrides."
     },
     "confidence": {
       "type": "number",
       "minimum": 0,
-      "maximum": 1,
-      "description": "Self-declared confidence; used by the highestConfidence resolver. Optional. User-mediated contributions implicitly = 1.0."
+      "maximum": 1
     },
-    "rationale": { "type": "string" },
-    "determinism": { "type": "string", "enum": ["DETERMINISTIC", "NON_DETERMINISTIC"] },
+    "rationale": {
+      "type": "string"
+    },
+    "determinism": {
+      "type": "string",
+      "enum": [
+        "DETERMINISTIC",
+        "NON_DETERMINISTIC"
+      ]
+    },
     "cacheKey": {
       "type": "string",
-      "description": "MANDATORY when determinism = NON_DETERMINISTIC. Used by the InferenceService cache and by re-derivation replay."
+      "description": "Required when determinism = NON_DETERMINISTIC. Stable hash of (KS id, KS version, all read inputs)."
     },
     "derivedFrom": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "Engine-managed lineage: contribution ids and SourceInterpretation ids the contributor read."
+      "items": {
+        "type": "string"
+      },
+      "description": "Ids of contributions read by the KS to produce this one."
     },
     "supersedes": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "Optional: ids of prior Contributions on the same (panel, subjectIdentityId, slot) that this one explicitly supersedes (e.g. user override). Engine still keeps the superseded contributions for audit; resolver excludes them."
+      "items": {
+        "type": "string"
+      },
+      "description": "Ids of contributions this one supersedes (engine-set)."
     },
-    "diagnostics": { "type": "array", "items": { "$ref": "gsmarc://gsm-sourcer/types/Diagnostic/v1" } },
-    "createdAt": { "type": "string", "format": "date-time" }
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "../types/Diagnostic.schema.json"
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
   },
+  "additionalProperties": false,
   "allOf": [
     {
-      "if": { "properties": { "determinism": { "const": "NON_DETERMINISTIC" } } },
-      "then": { "required": ["cacheKey"] }
+      "if": {
+        "properties": {
+          "determinism": {
+            "const": "NON_DETERMINISTIC"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "cacheKey"
+        ]
+      }
     }
-  ],
-  "additionalProperties": false
+  ]
 }

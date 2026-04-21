@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/panels/SourceInventory/v1",
+  "title": "SourceInventoryValue",
+  "description": "Value posted onto the SourceInventory panel: structural catalogue of source artefacts (no semantics yet). Polymorphic by `slot`. Pack-owned panel; engine declares the panel name only as part of the source-side topology contract.",
+  "type": "object",
+  "required": [
+    "slot",
+    "payload"
+  ],
+  "properties": {
+    "slot": {
+      "type": "string",
+      "description": "Closed contribution-type slot. Pack registers the closed set at boot. Examples used by the Repository Sourcing Pack: FileTreeNode, GitCommit, ModuleSpec, LanguageClassification, FileMetrics, SbomComponent, ConfigEntry."
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Slot-typed structured fields owned by the Pack."
+    },
+    "sourceContextId": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

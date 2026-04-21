@@ -2,23 +2,30 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/ks-descriptor/v1",
   "title": "KnowledgeSourceDescriptor",
-  "description": "Declarative metadata for a Knowledge Source (KS). Loaded by Control without invoking the KS. NOTE: KSs are unaware of each other (canonical Blackboard rule). Ordering between KSs MUST be expressed exclusively through trigger predicates over Blackboard state — there is no `dependsOn` field.",
+  "description": "Descriptor for a Knowledge Source (KS). KSs are Pack-shipped sandboxed Java JARs. KSs are unaware of each other; ordering is data-driven via triggerPredicate over Blackboard state. No `dependsOn` between KSs.",
   "type": "object",
-  "required": ["id", "family", "writesPanel", "readsPanels", "triggerPredicate", "determinismDefault", "parallelSafe"],
+  "required": [
+    "id",
+    "family",
+    "writesPanel",
+    "triggerPredicate",
+    "determinismDefault"
+  ],
   "properties": {
     "id": {
       "type": "string",
-      "format": "uri",
-      "description": "Versioned gsmarc:// URI. No implicit 'latest'."
+      "description": "Versioned gsmarc:// URI."
     },
     "family": {
       "type": "string",
       "enum": [
         "DiscoveryKS",
+        "RelationKS",
+        "InterfaceKS",
         "IdentificationKS",
-        "ArchetypingKS",
-        "StatementShapingKS",
         "ReconciliationKS",
+        "ArchetypeKS",
+        "StatementShapingKS",
         "GranularityKS",
         "EvidenceCollectionKS",
         "ConfidenceSynthesisKS"
@@ -26,68 +33,133 @@
     },
     "writesPanel": {
       "type": "string",
-      "enum": ["SourceInterpretation", "SubjectIdentity", "Archetyping", "Statement", "Granularity", "Evidence", "Confidence"],
-      "description": "The single Blackboard panel this KS contributes to."
+      "enum": [
+        "SourceInventory",
+        "SourceUnit",
+        "SourceRelation",
+        "SourceInterface",
+        "Definition",
+        "Archetype",
+        "Statement",
+        "Granularity",
+        "Evidence",
+        "Confidence"
+      ]
     },
     "writesSlots": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "Optional: panel-specific slot names this KS writes (e.g. 'archetypeRef'). Defaults to the panel's primary slot."
+      "items": {
+        "type": "string"
+      },
+      "description": "Slots within writesPanel that this KS may post (subset of the panel's closed slot set)."
     },
     "readsPanels": {
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["SourceInterpretation", "SubjectIdentity", "Archetyping", "Statement", "Granularity", "Evidence", "Confidence"]
+        "enum": [
+          "SourceInventory",
+          "SourceUnit",
+          "SourceRelation",
+          "SourceInterface",
+          "Definition",
+          "Archetype",
+          "Statement",
+          "Granularity",
+          "Evidence",
+          "Confidence"
+        ]
       },
-      "uniqueItems": true,
-      "description": "Panels this KS reads. Used by Control for parallelism analysis. NO transitive KS coupling: a KS reads Blackboard state, never another KS."
+      "description": "Panels this KS reads (must be subset of dependsOnPanels* of writesPanel in the panel DAG)."
     },
     "triggerPredicate": {
       "type": "string",
-      "description": "Tiny declarative DSL over Blackboard state. Read-only; no side effects, no method calls. May reference: panel kind, presence of resolved panel values for an identity, signals on SourceInterpretations, set membership. Example: 'panel == Statement && resolved(Archetyping, identity) && !contributedBy(self, identity)'."
+      "description": "Tiny declarative DSL over Blackboard state. Operators: ==, &&, ||, !, .size. Predicates: panel == <Panel>, slot == <Slot>, resolved(<Panel>, identity), contributedBy(self, identity), evidence(identity).size > N, runContext.scope.includes(identity)."
     },
     "appliesToInterpretationKinds": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "Optional filter for KSs whose trigger inspects SourceInterpretation.kind (e.g. ['CodeUnit', 'JpaEntity']). Used by Control for fast eligibility pruning; semantically equivalent to a check inside triggerPredicate."
-    },
-    "determinismDefault": {
-      "type": "string",
-      "enum": ["DETERMINISTIC", "NON_DETERMINISTIC"]
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional fast-pruning hint over slot names of read panels."
     },
     "parallelSafe": {
       "type": "boolean",
-      "description": "If true, Control may invoke this KS in parallel with other parallelSafe KSs whose readsPanels/writesPanel do not conflict on overlapping SubjectIdentities."
+      "default": true
+    },
+    "determinismDefault": {
+      "type": "string",
+      "enum": [
+        "DETERMINISTIC",
+        "NON_DETERMINISTIC"
+      ]
     },
     "resolverHint": {
       "type": "string",
-      "enum": ["highestConfidence", "firstWriter", "failOnConflict", "userMediated"],
-      "description": "Optional advisory: this KS author believes this resolver fits its panel/slot best. Control's effective resolver = (RunConfig override) > (KS hint) > (engine default for that panel)."
+      "enum": [
+        "highestConfidence",
+        "firstWriter",
+        "failOnConflict",
+        "userMediated",
+        "collectAll"
+      ],
+      "description": "Recommended ContributionResolver for the writesPanel; RunConfig may override."
     },
-    "defmanExplorationNeeded": { "type": "boolean", "default": false },
+    "inferenceServiceNeeded": {
+      "type": "boolean",
+      "default": false
+    },
+    "defmanExplorationNeeded": {
+      "type": "boolean",
+      "default": false
+    },
     "defmanReadScope": {
       "type": "array",
-      "items": { "type": "string", "format": "uri" },
-      "description": "If defmanExplorationNeeded, the engine restricts DefManExplorationService to these archetype URIs."
+      "items": {
+        "type": "string"
+      }
     },
-    "inferenceServiceNeeded": { "type": "boolean", "default": false },
+    "externalTools": {
+      "type": "array",
+      "description": "Whitelisted external binaries this KS will execve via ControlContext.tool(name). Engine enforces: tool must be (a) declared here AND (b) bound in RunConfig.externalToolBindings.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "versionSpec"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "versionSpec": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "budget": {
       "type": "object",
       "properties": {
-        "wallClockMs": { "type": "integer", "minimum": 0 },
-        "memoryMb": { "type": "integer", "minimum": 0 },
-        "inferenceTokens": { "type": "integer", "minimum": 0 },
-        "inferenceCostUsd": { "type": "number", "minimum": 0 },
-        "defmanCalls": { "type": "integer", "minimum": 0 }
+        "wallClockMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "memoryMb": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "inferenceTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "defmanCalls": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
       "additionalProperties": false
-    },
-    "title": { "type": "string" },
-    "description": { "type": "string" },
-    "implementationClass": {
-      "type": "string",
-      "description": "Fully-qualified Java class name implementing the KnowledgeSource interface."
     }
   },
   "additionalProperties": false

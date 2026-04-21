@@ -10,226 +10,155 @@ skinparam ArrowColor #57606A
 skinparam DefaultFontName "SansSerif"
 skinparam backgroundColor #FFFFFF
 
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #57606A
+  FontColor #24292F
+}
 skinparam packageStyle rectangle
 skinparam packageBackgroundColor #F6F8FA
 skinparam packageBorderColor #57606A
-
-skinparam classBackgroundColor #FFFFFF
-skinparam classBorderColor #57606A
-skinparam classFontColor #24292F
-
 skinparam noteBackgroundColor #FFF8C5
 skinparam noteBorderColor #57606A
 
-frame "CD - GSM Sourcer - Blackboard structure (panels + contributions)" {
+frame "CD - GSM Sourcer - Blackboard panel topology" {
 
-  note as BlackboardNote
-    **Canonical Blackboard pattern (Hayes-Roth / Erman-Lesser).**
+  package "Source Panels Group (Pack-owned)" as SRC {
+    class SourceInventory <<panel>> {
+      slots:
+      FileTreeNode
+      GitCommit
+      ModuleSpec
+      LanguageClassification
+      FileMetrics
+      SbomComponent
+      ConfigEntry
+    }
+    class SourceUnit <<panel>> {
+      slots:
+      CodeUnit          (SCIP SymbolInformation)
+      JpaEntity
+      ProtoMessage
+      GraphqlSchema
+      IacResource
+    }
+    class SourceRelation <<panel>> {
+      slots:
+      SymbolRef         (from SCIP occurrences)
+      TypeHierarchyEdge (from SCIP relationships)
+      ImplementationEdge
+      ImportEdge
+      CallEdge          (from Joern CPG)
+      DataflowEdge      (from Joern CPG)
+      DeploymentEdge
+    }
+    class SourceInterface <<panel>> {
+      slots:
+      OpenApiOperation
+      KafkaTopic
+      DbTable
+      TestSpec
+    }
+  }
 
-    The Blackboard is partitioned into **panels**, each representing
-    an **aspect of the problem space** (NOT a temporal phase). KSs
-    post **Contributions** onto panels; multiple Contributions on
-    the same (panel, subjectIdentityId, slot) coexist as competing
-    partial solutions.
+  package "Target Panels Group (engine-owned, GSM spine)" as TGT {
+    class Definition <<panel>> {
+      slots:
+      Claim   (IdentificationKS)
+      Merge   (ReconciliationKS)
+      ----
+      keyed by identityKey
+      subjectKind in
+      {Structure, Mechanism, Effector,
+       Receptor, Interaction, Archetype,
+       Directive, Norm}
+    }
+    class Archetype <<panel>> {
+      slots:
+      Application
+      ----
+      one ArchetypeRef per contribution
+      panel-effective value =
+      union over Applications
+    }
+    class Statement <<panel>> {
+      slots:
+      Draft
+      ----
+      validated against the
+      resolved archetype JSON Schema
+    }
+    class Granularity <<panel>> {
+      slots:
+      Verdict
+      ----
+      verdict in {keep, drop,
+                  splitInto, mergeWith}
+    }
+    class Evidence <<panel>> {
+      slots:
+      Signal
+      ----
+      additive; weight in [-1,1]
+      resolver = collectAll
+    }
+    class Confidence <<panel>> {
+      slots:
+      Score
+      ----
+      targetPanel in
+      {Definition, Archetype,
+       Statement, Granularity}
+    }
+  }
 
-    **Control resolves** the effective value at read time using a
-    **ContributionResolver** (per-panel; configurable per Run):
-    `highestConfidence` | `firstWriter` | `failOnConflict` |
-    `userMediated` | `collectAll`.
+  ' Panel DAG (Pack-owned source side + bridge + engine-owned target side)
+  SourceInventory --> SourceUnit
+  SourceUnit --> SourceInterface
+  SourceUnit --> SourceRelation
+  SourceInterface --> Definition : <<bridge>>
+  SourceUnit --> Definition : <<bridge>>
+  SourceRelation --> Definition : <<bridge>>
+  Definition --> Archetype
+  Archetype --> Statement
+  Statement --> Granularity
+  Statement --> Evidence
+  Evidence --> Confidence
 
-    **Validation Rules:**
-    - KSs are unaware of each other; coupling is allowed ONLY through
-      Blackboard state (no `dependsOn` between KSs).
-    - Contributions are append-only and immutable.
-    - SourceInterpretation contributions reference NO SubjectIdentity
-      (they precede subject identification).
-    - Every other-panel contribution MUST reference exactly one
-      SubjectIdentity contribution id.
-    - Engine-managed fields on every Contribution: `derivedFrom`,
-      `contributorKsId`, `createdAt`. KSs cannot fabricate them.
+  package "Off-Blackboard" as OBB <<Frame>> {
+    class SourcingRunContext <<immutable>> {
+      runId
+      profile
+      instructionsPayload
+      scope { inclusion, exclusion, axisDecision }
+      focus { priorityBands }
+      runInvariants { maxIterations,
+                      quiescenceThreshold,
+                      determinismMode }
+      resolverOverrides
+      externalToolBindings
+      ----
+      built by Initializer in
+      3 substeps; frozen for the Run;
+      read by all KSs via
+      controlContext.runContext()
+    }
+  }
+
+  note bottom of SRC
+    Pack-owned topology. Slot sets are CLOSED at Pack
+    registration (one slot = one contribution-type =
+    one panel property). Panel value schema is owned
+    by the Pack.
   end note
 
-  package "Blackboard panels (aspects of the problem space)" as Panels {
-
-    class "SourceInterpretation panel" as PSI <<panel>> {
-      Holds typed interpretations
-      of source artifacts.
-      Polymorphic: many `kind`s coexist.
-    }
-
-    class "SubjectIdentity panel" as PID <<panel>> {
-      Holds hypotheses about
-      what GSM subject(s) the
-      interpretations describe.
-    }
-
-    class "Archetyping panel" as PAR <<panel>> {
-      Holds hypotheses about
-      which Archetype URIs apply
-      to a SubjectIdentity.
-    }
-
-    class "Statement panel" as PST <<panel>> {
-      Holds hypotheses about
-      the populated GSM statement
-      payload for a SubjectIdentity.
-    }
-
-    class "Granularity panel" as PGR <<panel>> {
-      Holds hypotheses about
-      consolidation decisions
-      (keep / drop / split / merge).
-    }
-
-    class "Evidence panel" as PEV <<panel>> {
-      Holds additive corroboration
-      items (resolver = collectAll).
-    }
-
-    class "Confidence panel" as PCO <<panel>> {
-      Holds synthesized confidence
-      scores per panel decision.
-    }
-  }
-
-  package "Contribution model" as CM {
-
-    class Contribution {
-      +id : ContributionId
-      +panel : Panel
-      +subjectIdentityId : SubjectIdentityId?
-      +slot : SlotName
-      +value : PanelValue
-      +contributorKsId : KnowledgeSourceId
-      +confidence : Float?
-      +rationale : String?
-      +determinism : enum { DETERMINISTIC, NON_DETERMINISTIC }
-      +cacheKey : CacheKey?
-      +derivedFrom : List<ContributionId>
-      +supersedes : List<ContributionId>
-      +diagnostics : List<Diagnostic>
-      +createdAt : Instant
-    }
-    note right of Contribution
-      `cacheKey` MANDATORY when determinism = NON_DETERMINISTIC.
-      `subjectIdentityId` REQUIRED on every panel except
-      SourceInterpretation.
-      `supersedes` is set by user-mediated overrides.
-    end note
-
-    abstract class PanelValue
-    class SourceInterpretationValue {
-      +kind : InterpretationKind
-      +sourceContextId : SourceContextId
-      +sourceIdentityKey : String
-      +contentRef : OpaqueRef
-      +payload : Map<String, Any>?
-      +signals : Map<String, String>?
-    }
-    note right of SourceInterpretationValue
-      `kind` is an OPEN enum. Engine ships:
-      CodeUnit, OpenApiOperation, KafkaTopic,
-      JpaEntity, MavenDependency, TestSpec,
-      IacResource, GitCommit, ConfigEntry,
-      ProtoMessage, GraphqlSchema.
-      Sourcing Packs may register more.
-    end note
-
-    class SubjectIdentityValue {
-      +subjectKind : GsmSubjectKind
-      +identityKey : String
-      +interpretsIds : List<ContributionId>
-      +displayName : String?
-      +rationale : String?
-    }
-
-    class ArchetypingValue {
-      +archetypeRef : ArchetypeUri
-      +rationale : String?
-    }
-    note right of ArchetypingValue
-      ONE archetype per Contribution.
-      Resolved Archetyping for a SubjectIdentity =
-      union of accepted contributions
-      (resolver default: collectAll, with per-ref
-      conflict via failOnConflict if competing rationales).
-    end note
-
-    class StatementValue {
-      +statement : Map<String, Any>
-      +completeness : enum { partial, full }
-      +shapingMethod : String
-      +rationale : String?
-    }
-
-    class GranularityValue {
-      +verdict : enum { keep, drop, splitInto, mergeWith }
-      +targetIdentityKeys : List<String>
-      +rationale : String?
-    }
-
-    class EvidenceValue {
-      +source : String
-      +signal : String
-      +weight : Float [-1..1]
-      +rationale : String?
-      +supportingInterpretsIds : List<ContributionId>
-    }
-
-    class ConfidenceValue {
-      +targetPanel : enum { Archetyping, Statement, Granularity }
-      +score : Float [0..1]
-      +method : String
-      +supportingEvidenceIds : List<ContributionId>
-      +rationale : String?
-    }
-
-    PanelValue <|-- SourceInterpretationValue
-    PanelValue <|-- SubjectIdentityValue
-    PanelValue <|-- ArchetypingValue
-    PanelValue <|-- StatementValue
-    PanelValue <|-- GranularityValue
-    PanelValue <|-- EvidenceValue
-    PanelValue <|-- ConfidenceValue
-
-    Contribution "1" *-- "1" PanelValue : value
-  }
-
-  PSI ..> Contribution : holds (value : SourceInterpretationValue)
-  PID ..> Contribution : holds (value : SubjectIdentityValue)
-  PAR ..> Contribution : holds (value : ArchetypingValue)
-  PST ..> Contribution : holds (value : StatementValue)
-  PGR ..> Contribution : holds (value : GranularityValue)
-  PEV ..> Contribution : holds (value : EvidenceValue)
-  PCO ..> Contribution : holds (value : ConfidenceValue)
-
-  package "Common types" as Types {
-    enum GsmSubjectKind {
-      Structure
-      Mechanism
-      Effector
-      Receptor
-      Interaction
-      Archetype
-      Directive
-      Norm
-    }
-    enum Panel {
-      SourceInterpretation
-      SubjectIdentity
-      Archetyping
-      Statement
-      Granularity
-      Evidence
-      Confidence
-    }
-    class Diagnostic {
-      +severity : enum { info, warning, error, fatal }
-      +code : String
-      +message : String
-      +sourceKsId : KnowledgeSourceId?
-    }
-  }
+  note bottom of TGT
+    Engine-owned topology (GSM spine). Closed slot
+    sets, frozen value schemas. The Pipeline consumes
+    the converged target tuple; Pipeline records
+    (ValidatedAscriptionDraft, RegisteredAscription)
+    are NOT panels.
+  end note
 }
 
 @enduml

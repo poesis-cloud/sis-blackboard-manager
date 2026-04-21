@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/sourcing-run-context/v1",
+  "title": "SourcingRunContext",
+  "description": "Off-Blackboard, immutable per-Run context. Built by the Initializer in three deterministic substeps: (1) Instructions Provider returns instructionsPayload + profile + Pack-typed user config; (2) Scope Builder derives scope from profile (engine default; Pack may override); (3) Focus Builder derives focus from scope + RunConfig (engine default; Pack may override). Frozen after Initialization. Read-only access via ControlContext.runContext().",
+  "type": "object",
+  "required": [
+    "runId",
+    "profile",
+    "instructionsPayload",
+    "scope",
+    "focus",
+    "runInvariants"
+  ],
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Pack-typed enums (e.g. axis1, axis2)."
+    },
+    "instructionsPayload": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Domain-specific payload returned by the Instructions Provider; conforms to the Pack's instructionsPayloadSchemaRef."
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "inclusion": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "exclusion": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "axisDecision": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "focus": {
+      "type": "object",
+      "properties": {
+        "priorityBands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "identityPattern",
+              "band"
+            ],
+            "properties": {
+              "identityPattern": {
+                "type": "string"
+              },
+              "band": {
+                "type": "string",
+                "enum": [
+                  "hot",
+                  "warm",
+                  "cold"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "runInvariants": {
+      "type": "object",
+      "required": [
+        "maxIterations",
+        "quiescenceThreshold",
+        "determinismMode"
+      ],
+      "properties": {
+        "maxIterations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "quiescenceThreshold": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "determinismMode": {
+          "type": "string",
+          "enum": [
+            "strict",
+            "lenient"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "resolverOverrides": {
+      "type": "object",
+      "description": "Per-panel resolver overrides keyed by panel name.",
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "highestConfidence",
+          "firstWriter",
+          "failOnConflict",
+          "userMediated",
+          "collectAll"
+        ]
+      }
+    },
+    "externalToolBindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "resolvedPath",
+          "version"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "resolvedPath": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

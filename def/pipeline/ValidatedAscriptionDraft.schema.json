@@ -2,11 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/pipeline/ValidatedAscriptionDraft/v1",
   "title": "ValidatedAscriptionDraft",
-  "description": "Engine-internal Pipeline record. Produced by the Validation stage from a converged Blackboard tuple. NOT a Blackboard panel value. Carries an audit trail of resolver decisions.",
+  "description": "Engine-internal Pipeline record produced by the Validation stage from a converged target-spine tuple (one Definition + its resolved Archetype/Statement/Granularity/Evidence/Confidence). NOT a Blackboard panel.",
   "type": "object",
   "required": [
     "id",
-    "subjectIdentityId",
+    "definitionContributionId",
     "subjectKind",
     "identityKey",
     "archetypeRefs",
@@ -19,13 +19,21 @@
     "id": {
       "type": "string"
     },
-    "subjectIdentityId": {
-      "type": "string",
-      "description": "Id of the winning SubjectIdentity Contribution."
+    "definitionContributionId": {
+      "type": "string"
     },
     "subjectKind": {
       "type": "string",
-      "description": "GSM subject kind (Structure, Mechanism, Effector, Receptor, Interaction, Archetype, Directive, Norm)."
+      "enum": [
+        "Structure",
+        "Mechanism",
+        "Effector",
+        "Receptor",
+        "Interaction",
+        "Archetype",
+        "Directive",
+        "Norm"
+      ]
     },
     "identityKey": {
       "type": "string"
@@ -35,13 +43,11 @@
       "items": {
         "type": "string"
       },
-      "minItems": 1,
-      "description": "Union of winning Archetyping contributions for this identity."
+      "minItems": 1
     },
     "statement": {
       "type": "object",
-      "additionalProperties": true,
-      "description": "Winning Statement value (validated against the resolved archetype JSON Schema)."
+      "additionalProperties": true
     },
     "granularityVerdict": {
       "type": "string",
@@ -83,8 +89,8 @@
           "panel": {
             "type": "string",
             "enum": [
-              "SubjectIdentity",
-              "Archetyping",
+              "Definition",
+              "Archetype",
               "Statement",
               "Granularity",
               "Evidence",

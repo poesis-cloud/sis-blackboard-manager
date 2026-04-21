@@ -15,128 +15,121 @@ skinparam packageBackgroundColor #F6F8FA
 skinparam packageBorderColor #57606A
 skinparam componentBackgroundColor #FFFFFF
 skinparam componentBorderColor #57606A
-skinparam componentFontColor #24292F
-skinparam interfaceBackgroundColor #FFFFFF
-skinparam interfaceBorderColor #57606A
 skinparam noteBackgroundColor #FFF8C5
 skinparam noteBorderColor #57606A
 
-frame "PD - GSM Sourcer - Component architecture" {
+frame "PD - GSM Sourcer - Component view" {
 
-  note as ArchNote
-    **Engine is IT-domain agnostic.** No knowledge of git, Maven,
-    Spring, OpenAPI, languages, build systems, or repositories
-    inside Control or any engine utility.
+  package "API surface" as API_PKG {
+    component "Sourcer API\n(POST /runs, GET /runs/{id},\n /runs/{id}/blackboard,\n /runs/{id}/checkpoints/*)" as API
+  }
 
-    All IT-domain knowledge lives in **Sourcing Packs** loaded in
-    sandboxed classloaders with network egress denied.
+  package "Initialization" as INIT_PKG {
+    component "Initializer" as Init
+    component "Plug-in Loader\n(sandboxed classloader per Pack)" as Loader
+    component "Scope Builder\n(engine default; Pack may override)" as ScopeB
+    component "Focus Builder\n(engine default; Pack may override)" as FocusB
+  }
 
-    **Canonical Blackboard pattern:** Control schedules KSs based on
-    declarative trigger predicates over Blackboard state, then
-    resolves competing Contributions per panel using
-    ContributionResolver. The Pipeline (Validation -> Registration)
-    is a separate, engine-only stage that consumes the converged
-    Blackboard.
+  package "Control" as CTRL_PKG {
+    component "Control\n(panel-DAG-aware scheduler;\nevaluates triggerPredicates over\nBlackboard state)" as Ctrl
+    component "ContributionResolver\n(per-panel: highestConfidence /\nfirstWriter / failOnConflict /\nuserMediated / collectAll)" as Res
+    component "Convergence Detector\n(quiescence: N empty iterations)" as Conv
+    component "Override Cascader\n(invalidate dependents on supersession)" as Casc
+  }
+
+  package "Blackboard (in-memory + persisted)" as BB_PKG {
+    component "Source Panels\n(SourceInventory, SourceUnit,\nSourceRelation, SourceInterface)" as BB_SRC
+    component "Target Panels\n(Definition, Archetype, Statement,\nGranularity, Evidence, Confidence)" as BB_TGT
+  }
+
+  package "Off-Blackboard run state" as RC_PKG {
+    component "SourcingRunContext\n(immutable per Run)" as RC
+    component "RunConfig\n(operator input)" as RCfg
+  }
+
+  package "Pipeline (engine-only)" as PIPE_PKG {
+    component "Validation Stage\n(JSON Schema + GSM invariants)" as Val
+    component "Registration Stage\n(POST DefMan DRAFT)" as Reg
+    component "ValidatedAscriptionDraft\n+ RegisteredAscription records" as PipeRec
+  }
+
+  package "Governance overlay" as CHK_PKG {
+    component "Checkpoint Mediator\n(A: post-convergence;\nB: post-validation)" as Chk
+  }
+
+  package "Persistence & I/O" as PERS_PKG {
+    component "BundleStore\n(SourceContextSnapshot,\nblackboard snapshots,\nbinary artefacts)" as BS
+    component "RunLedger\n(audit: per-iteration,\nresolver decisions,\ncheckpoint outcomes)" as RL
+  }
+
+  package "Inference & DefMan exploration" as INF_PKG {
+    component "InferenceService\n(LLM proxy with per-Run cache)" as Inf
+    component "DefManExplorationService\n(read-only navigation)" as DefExp
+    component "DefManClient\n(Registration only)" as DM
+  }
+
+  package "Sandbox & Tools" as SBX_PKG {
+    component "Sandbox\n(network deny, execve allowlist,\nresource limits)" as Sbx
+    component "External Tools Adapter\n(scip-*, syft, tokei, joern, ...)" as ExtT
+  }
+
+  API --> Init
+  Init --> Loader : load Pack
+  Loader --> Sbx : classloader
+  Init --> ScopeB
+  Init --> FocusB
+  ScopeB --> RC
+  FocusB --> RC
+  Init --> RC : freeze
+  Init --> Ctrl : start
+  Init --> BS : initial snapshot
+
+  Ctrl --> BB_SRC
+  Ctrl --> BB_TGT
+  Ctrl --> Res
+  Ctrl --> Conv
+  Ctrl --> Casc
+  Ctrl --> RL
+  Ctrl --> Chk : Checkpoint-A
+  Ctrl --> Val : pass converged tuples
+  Val --> PipeRec
+  Val --> Chk : Checkpoint-B
+  Chk --> Reg : approved
+  Reg --> DM
+  Reg --> PipeRec
+  Reg --> RL
+
+  ' KS execution (KSs themselves not shown; loaded by Loader and invoked by Ctrl)
+  Ctrl ..> Inf : KS-driven
+  Ctrl ..> DefExp : KS-driven
+  Ctrl ..> ExtT : KS-driven
+  ExtT --> Sbx : enforced
+
+  RCfg --> Init
+  RC --> Ctrl : runContext()
+  RC --> Sbx : externalToolBindings\n(execve allowlist)
+
+  note bottom of CTRL_PKG
+    Control is panel-graph-agnostic: it knows only the
+    declared panel DAG and KS triggerPredicates. It has
+    no semantic knowledge of any panel.
   end note
 
-  package "GSM Sourcer engine" as Engine {
+  note bottom of PIPE_PKG
+    Pipeline records are engine state (NOT Blackboard
+    panels). Validation and Registration may emit
+    diagnostics that re-fire upstream KS triggers
+    (capped retries).
+  end note
 
-    component "Run Control\n(REST API)" as RunControl
-
-    component "Plug-in Resolver\n(R3 -> R3.5 -> R6)" as PackResolver
-
-    component "Control\n(scheduler)" as Control
-    component "ContributionResolver\n(per-panel)" as Resolver
-    Control *-- Resolver
-
-    package "Engine utilities" as Utils {
-      component "Snapshot" as Snapshot
-      component "BundleStore\n(object storage)" as BundleStore
-      component "ArchetypeResolver" as ArchetypeResolver
-      component "JsonSchemaValidator" as Validator
-      component "InferenceService\n(LLM client +\nprompt assembly +\ntool routing +\ncost ledger)" as Inference
-      component "DefManExplorationService\n(read-only +\ntenant-scoped +\nper-Run cache)" as DefManExplore
-      component "DefManClient\n(write: Registration only)" as DefManClient
-      component "RunLedger (PG)" as RunLedger
-    }
-
-    package "Blackboard\n(panels = aspects of the problem space)" as Blackboard {
-      component "SourceInterpretation" as P_SI
-      component "SubjectIdentity" as P_ID
-      component "Archetyping" as P_AR
-      component "Statement" as P_ST
-      component "Granularity" as P_GR
-      component "Evidence" as P_EV
-      component "Confidence" as P_CO
-    }
-
-    package "Pipeline (engine-only)" as Pipeline {
-      component "Validation stage\n(JsonSchemaValidator)" as VStage
-      component "Registration stage\n(DefManClient)" as RStage
-      VStage --> RStage
-    }
-
-    package "Sandbox" as Sandbox {
-      component "KS classloader 1" as CL1
-      component "KS classloader 2" as CL2
-      component "KS classloader N" as CLN
-    }
-
-    interface "ControlContext" as CCtx
-
-    RunControl --> PackResolver : load packs
-    RunControl --> Control : start Run
-    Control --> Sandbox : fire KSs
-    Control --> Blackboard : post / read / resolve
-    Blackboard --> Pipeline : converged contributions
-    Pipeline --> Validator
-    Pipeline --> DefManClient
-    Pipeline --> RunLedger
-    Control --> Snapshot
-    Control --> BundleStore : checkpoint
-    Control --> ArchetypeResolver
-    Control --> Inference : tool wiring
-    Control --> DefManExplore : tool wiring
-    Control --> RunLedger : audit
-
-    Sandbox -( CCtx
-    CCtx -- Blackboard
-    CCtx -- Snapshot
-    CCtx -- ArchetypeResolver
-    CCtx -- Validator
-    CCtx -- Inference
-    CCtx -- DefManExplore
-    CCtx -- BundleStore : read-only
-
-    Inference --> DefManExplore : tool (function-calling)
-  }
-
-  package "Sourcing Packs (external)" as Packs {
-    component "ITIP GSM Sourcing Pack\n(Java JARs)" as ItipPack
-    component "Other domain packs\n(legislation, regulatory, ...)" as OtherPacks
-  }
-
-  PackResolver --> Packs : loads JARs
-  ItipPack ..> CL1 : provides KSs
-  OtherPacks ..> CL2 : provides KSs
-
-  package "External systems" as External {
-    component "DefMan API\n(SIE Definition Manager)" as DefMan
-    component "LLM provider(s)" as LlmProvider
-    component "Source artifacts\n(opaque to engine)" as Source
-  }
-
-  DefManClient --> DefMan : DRAFT submission
-  DefManExplore --> DefMan : HATEOAS read
-  Inference --> LlmProvider : completions
-  Snapshot --> Source : opaque snapshot
-
-  note bottom of Sandbox
-    **Sandboxing rules:**
-    - Each pack loaded in its own classloader.
-    - Pack JARs scanned at load (jdeps): forbidden packages rejected.
-    - Network egress denied at pack-classloader scope.
-    - LLM and DefMan calls only via ControlContext services.
+  note bottom of SBX_PKG
+    External tools are 3-layer authorized:
+    (1) Pack manifest declares the upper bound
+        (requestedExternalTools[]).
+    (2) RunConfig narrows by binding names to host paths
+        (externalToolBindings[]).
+    (3) Sandbox execve is restricted to bindings.
   end note
 }
 

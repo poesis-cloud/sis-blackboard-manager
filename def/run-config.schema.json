@@ -2,128 +2,123 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/run-config/v1",
   "title": "RunConfig",
-  "description": "Configuration for one Run of GSM Sourcer.",
+  "description": "Operator-supplied configuration for a Run. The Initializer combines this with the Pack's Instructions Provider output to build the immutable SourcingRunContext.",
   "type": "object",
-  "required": ["sourceContext", "sourcingPacks", "profile"],
+  "required": [
+    "sourcingPacks",
+    "profile"
+  ],
   "properties": {
-    "sourceContext": {
-      "type": "object",
-      "required": ["kind", "uri"],
-      "properties": {
-        "kind": {
-          "type": "string",
-          "description": "Opaque to engine; meaningful to a DiscoveryKS that recognizes it (e.g. 'git-repo', 'local-path', 'openapi-doc')."
-        },
-        "uri": { "type": "string" },
-        "credentialsRef": { "type": "string" }
-      },
-      "additionalProperties": true
-    },
     "sourcingPacks": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["uri"],
+        "required": [
+          "uri"
+        ],
         "properties": {
           "uri": {
             "type": "string",
-            "format": "uri",
-            "description": "Versioned gsmarc:// URI of a Sourcing Pack. No implicit 'latest'."
+            "description": "Versioned gsmarc:// Pack URI."
           },
-          "ksOverrides": {
+          "disabledKnowledgeSources": {
             "type": "array",
             "items": {
-              "type": "object",
-              "required": ["ksId"],
-              "properties": {
-                "ksId": { "type": "string", "format": "uri" },
-                "enabled": { "type": "boolean" },
-                "budget": { "type": "object" }
-              }
+              "type": "string"
             }
+          },
+          "ksBudgetOverrides": {
+            "type": "object",
+            "additionalProperties": true
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     "profile": {
       "type": "object",
-      "required": ["axis1", "axis2"],
-      "properties": {
-        "axis1": {
-          "type": "string",
-          "enum": ["Functional", "Reachability", "TestCorroborated", "HotspotWeighted", "CoverageDriven"],
-          "description": "Intake filter profile (Axis-1, depth). Applied as a Control admission policy at SubjectIdentity creation time."
-        },
-        "axis2": {
-          "type": "string",
-          "enum": ["Standard", "Coarse", "Fine", "BoundaryOnly"],
-          "description": "Granularity / consolidation profile (Axis-2). Biases which GranularityKSs are eligible to fire."
-        }
-      },
-      "additionalProperties": false
+      "additionalProperties": true
     },
-    "targetCatalogues": {
-      "type": "array",
-      "items": { "type": "string", "format": "uri" },
-      "description": "Catalogue archetype roots a contributor may attach (e.g. TOGAF, SAFe, ISO 25000). Restricts which ArchetypingKS contributions are eligible."
-    },
-    "contributionResolvers": {
+    "instructionsPayload": {
       "type": "object",
-      "description": "Per-panel ContributionResolver selection. Default per panel: SourceInterpretation = collectAll; SubjectIdentity = highestConfidence; Archetyping = collectAll (the resolved value is the union of accepted contributions); Statement = highestConfidence; Granularity = highestConfidence; Evidence = collectAll; Confidence = highestConfidence.",
+      "additionalProperties": true,
+      "description": "Operator input forwarded verbatim to the Pack's Instructions Provider."
+    },
+    "resolverOverrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "highestConfidence",
+          "firstWriter",
+          "failOnConflict",
+          "userMediated",
+          "collectAll"
+        ]
+      }
+    },
+    "externalToolBindings": {
+      "type": "array",
+      "description": "Operator narrows the Pack's requestedExternalTools to actual host paths. Sandbox execve is restricted to these resolved bindings.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "resolvedPath",
+          "version"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "resolvedPath": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "runInvariants": {
+      "type": "object",
       "properties": {
-        "SubjectIdentity": { "$ref": "#/$defs/Resolver" },
-        "Archetyping":     { "$ref": "#/$defs/Resolver" },
-        "Statement":       { "$ref": "#/$defs/Resolver" },
-        "Granularity":     { "$ref": "#/$defs/Resolver" },
-        "Confidence":      { "$ref": "#/$defs/Resolver" }
+        "maxIterations": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 100
+        },
+        "quiescenceThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "determinismMode": {
+          "type": "string",
+          "enum": [
+            "strict",
+            "lenient"
+          ],
+          "default": "lenient"
+        }
       },
       "additionalProperties": false
     },
     "checkpoints": {
       "type": "object",
       "properties": {
-        "checkpointA": { "type": "boolean", "default": true, "description": "Pause after Blackboard convergence, before Validation pipeline stage." },
-        "checkpointB": { "type": "boolean", "default": true, "description": "Pause after Validation, before Registration pipeline stage." },
-        "synchronous": { "type": "boolean", "default": false }
+        "A": {
+          "type": "boolean",
+          "default": false
+        },
+        "B": {
+          "type": "boolean",
+          "default": true
+        }
       },
       "additionalProperties": false
-    },
-    "convergence": {
-      "type": "object",
-      "description": "Stopping criteria for the Blackboard convergence loop.",
-      "properties": {
-        "maxIterations": { "type": "integer", "minimum": 1, "default": 100 },
-        "quiesceAfterEmptyIterations": { "type": "integer", "minimum": 1, "default": 1, "description": "Number of consecutive iterations with zero new Contributions before declaring quiescence." }
-      },
-      "additionalProperties": false
-    },
-    "inference": {
-      "type": "object",
-      "properties": {
-        "providerRef": { "type": "string" },
-        "model": { "type": "string" },
-        "modelVersion": { "type": "string" },
-        "temperature": { "type": "number" },
-        "maxTokens": { "type": "integer" },
-        "cacheEnabled": { "type": "boolean", "default": true }
-      },
-      "additionalProperties": false
-    },
-    "globalBudget": {
-      "type": "object",
-      "properties": {
-        "wallClockMs": { "type": "integer" },
-        "inferenceCostUsd": { "type": "number" },
-        "defmanCalls": { "type": "integer" }
-      }
-    }
-  },
-  "$defs": {
-    "Resolver": {
-      "type": "string",
-      "enum": ["highestConfidence", "firstWriter", "failOnConflict", "userMediated", "collectAll"],
-      "description": "ContributionResolver. `collectAll` = effective value is union/concat of all contributions (used for additive panels). `userMediated` = escalate to a Checkpoint if more than one contribution exists."
     }
   },
   "additionalProperties": false

@@ -18,69 +18,68 @@ skinparam componentBorderColor #57606A
 skinparam noteBackgroundColor #FFF8C5
 skinparam noteBorderColor #57606A
 
-frame "PD - GSM Sourcer - System overview (canonical Blackboard pattern)" {
+frame "PD - GSM Sourcer - System overview" {
 
-  package "Engine (IT-domain agnostic)" as Eng {
+  actor "Run Operator" as Op
+  actor "Reviewer\n(checkpoint)" as Rev
+  actor "Pack Author" as Author
 
-    component "Run Control" as RC
-    component "Plug-in Resolver" as PR
-    component "Control\n(scheduler +\nContributionResolver)" as Ctrl
-
-    package "Blackboard\n(panels = aspects of the problem space)" as BB {
-      component "SourceInterpretation\npanel" as P_SI
-      component "SubjectIdentity\npanel" as P_ID
-      component "Archetyping\npanel" as P_AR
-      component "Statement\npanel" as P_ST
-      component "Granularity\npanel" as P_GR
-      component "Evidence\npanel" as P_EV
-      component "Confidence\npanel" as P_CO
-    }
-
-    component "Pipeline\n(Validation -> Registration)" as Pipe
-
-    component "Engine utilities\n(Snapshot, BundleStore,\nArchetypeResolver,\nJsonSchemaValidator,\nInferenceService,\nDefManExplorationService,\nDefManClient,\nRunLedger)" as Utils
-
-    RC --> PR
-    RC --> Ctrl
-    Ctrl --> BB
-    BB --> Pipe : converged contributions
-    Ctrl --> Utils
-    Pipe --> Utils
+  package "GSM Sourcer engine\n(IT-domain agnostic, owns the meta-model + GSM target spine)" as Engine {
+    component "Sourcer API\n(POST /runs)" as API
+    component "Initializer\n(builds SourcingRunContext\nin 3 substeps; stands up Blackboard)" as Init
+    component "Control\n(panel-DAG-aware scheduler;\nfires KSs whose triggerPredicate\nholds against Blackboard state)" as Ctrl
+    component "Blackboard\n(Source group + Target group panels;\nhypothesis-only)" as BB
+    component "ContributionResolver\n(per-panel; default + RunConfig overrides)" as Res
+    component "Pipeline\n(Validation -> Registration; engine-only)" as Pipe
+    component "Checkpoint Mediator\n(governance overlay A/B)" as Chk
+    component "DefManClient\n(Registration only)" as DM
+    component "BundleStore\n(snapshots; raw & derived artefacts)" as BS
+    component "RunLedger\n(audit trail; resolver decisions)" as RL
+    component "InferenceService\n(LLM proxy with cache)" as Inf
+    component "DefManExplorationService\n(read-only navigation)" as DefExp
   }
 
-  package "Sourcing Packs (Java JARs)" as Packs {
-    component "ITIP GSM Sourcing Pack" as Itip
-    component "Other domain packs\n(legislation, regulatory, ...)" as Other
+  package "Sourcing Pack\n(Pack-shipped, sandboxed; e.g. itip/repository-sourcing-pack/v1)" as Pack {
+    component "Instructions Provider\n(plug-in; one per Pack;\nfills SourcingRunContext)" as IP
+    component "Source-side panel declarations\n(Pack-owned topology)" as PD_SRC
+    component "Knowledge Sources\n(KS JARs; trigger over Blackboard state)" as KS
+    component "External tools (whitelisted)\nscip-*, syft, tokei, joern, ..." as Tools
   }
 
-  package "External" as Ext {
-    component "Source artifacts\n(opaque)" as Src
-    component "DefMan API" as DM
-    component "LLM provider" as LLM
-  }
+  Op --> API
+  API --> Init
+  Init --> IP : invoke once\n(returns instructionsPayload + profile)
+  Init --> BB : declare panels (engine + Pack)
+  Init --> Ctrl : start
+  Ctrl --> KS : fire eligible KSs
+  KS --> BB : post Contribution(panel, slot, value)
+  KS --> Inf : optional
+  KS --> DefExp : optional (read-only)
+  KS --> Tools : execve (sandboxed)
+  Ctrl --> Res : reconcile competing contributions
+  Ctrl --> Chk : Checkpoint-A (post-convergence)
+  Ctrl --> Pipe : hand converged target tuples
+  Pipe --> Chk : Checkpoint-B (post-validation)
+  Pipe --> DM : POST /ascriptions DRAFT
+  Pipe --> RL : record per-stage outcomes
+  Init --> BS : sourceContext snapshot
+  Rev --> Chk : approve / override / reject
 
-  PR --> Packs : load JARs
-  Packs ..> Ctrl : KSs fire via ControlContext\n(KSs unaware of each other)
+  Author ..> Pack : authors KSs +\nInstructions Provider +\nsource-side panels
 
-  Utils --> Src : opaque snapshot
-  Utils --> DM : DRAFT + HATEOAS read
-  Utils --> LLM : completions (with tool wiring)
-
-  note bottom of BB
-    **Canonical Blackboard (Hayes-Roth / Erman-Lesser).**
-    Panels = ASPECTS OF THE PROBLEM SPACE.
-    Each panel holds Contributions; multiple
-    contributions on the same (panel, identity, slot)
-    coexist; Control resolves the effective value.
-    KSs are aware ONLY of the Blackboard, never of
-    each other.
+  note bottom of Engine
+    Engine ships: meta-model (Panel/Contribution/KS/InstructionsProvider),
+    target spine (Definition, Archetype, Statement, Granularity, Evidence,
+    Confidence), Initializer, Control, ContributionResolver, Pipeline,
+    Checkpoint Mediator, BundleStore, RunLedger, InferenceService,
+    DefManExplorationService, DefManClient.
   end note
 
-  note bottom of Pipe
-    **Pipeline is NOT part of the Blackboard.**
-    Engine-only stages that consume the converged
-    Blackboard: schema-Validation -> Checkpoint-B
-    -> Registration to DefMan.
+  note bottom of Pack
+    Pack ships: an Instructions Provider, source-side panel declarations
+    (panel name + slot set + value schema + dependsOnPanels), and a set of
+    KS descriptors. The Pack also declares requestedExternalTools[] (upper
+    bound). The operator's RunConfig narrows tool bindings.
   end note
 }
 

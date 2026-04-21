@@ -1,26 +1,41 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/Statement/v1",
-  "title": "Statement contribution value",
-  "description": "Value type for contributions on the Statement panel. Each contribution proposes a (partial or full) GSM statement payload for the referenced SubjectIdentity. Multiple StatementShapingKSs may contribute competing statements; Control resolves via ContributionResolver. Incremental schema validation against the resolved Archetyping panel runs on each post.",
+  "title": "StatementValue",
+  "description": "Value posted onto the Statement panel (engine-owned, GSM-spine): populated GSM statement payload conforming to the resolved archetype JSON Schema.",
   "type": "object",
-  "required": ["statement"],
+  "required": [
+    "slot",
+    "targetIdentityKey",
+    "statement",
+    "completeness",
+    "shapingMethod"
+  ],
   "properties": {
+    "slot": {
+      "type": "string",
+      "enum": [
+        "Draft"
+      ]
+    },
+    "targetIdentityKey": {
+      "type": "string"
+    },
     "statement": {
       "type": "object",
-      "description": "GSM statement payload, expected to validate against the resolved archetypeSchema for the SubjectIdentity (resolution = engine ArchetypeResolver applied to the resolved Archetyping panel value, allOf-expanded).",
       "additionalProperties": true
     },
     "completeness": {
       "type": "string",
-      "enum": ["partial", "full"],
-      "description": "Self-declared completeness. Partial statements may be merged or refined by other StatementShapingKSs; full statements stand on their own."
+      "enum": [
+        "partial",
+        "full"
+      ]
     },
     "shapingMethod": {
       "type": "string",
-      "description": "Free-text identifier for the shaping method (e.g. 'spring-annotation-extract', 'openapi-operation-mapping', 'llm-behavioral-lift'). Captured for audit and resolver heuristics."
-    },
-    "rationale": { "type": "string" }
+      "description": "Identifier of the shaping method (e.g. structural-extraction, llm-behavioral-lift)."
+    }
   },
   "additionalProperties": false
 }

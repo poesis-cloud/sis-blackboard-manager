@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/panels/SourceInterface/v1",
+  "title": "SourceInterfaceValue",
+  "description": "Value posted onto the SourceInterface panel: externally observable contracts of the IT-system under analysis. Pack-owned. Examples used by the Repository Sourcing Pack: OpenApiOperation, KafkaTopic, DbTable, TestSpec.",
+  "type": "object",
+  "required": [
+    "slot",
+    "sourceIdentityKey",
+    "payload"
+  ],
+  "properties": {
+    "slot": {
+      "type": "string"
+    },
+    "sourceIdentityKey": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

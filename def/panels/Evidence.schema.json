@@ -1,30 +1,44 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/Evidence/v1",
-  "title": "Evidence contribution value",
-  "description": "Value type for contributions on the Evidence panel. Evidence is ADDITIVE: every Evidence contribution stands on its own (the resolver for this panel is implicitly 'collect-all'). Consumed by ConfidenceSynthesisKSs.",
+  "title": "EvidenceValue",
+  "description": "Value posted onto the Evidence panel (engine-owned, GSM-spine): additive corroboration per Definition. Resolver default = collectAll.",
   "type": "object",
-  "required": ["source", "signal", "weight"],
+  "required": [
+    "slot",
+    "targetIdentityKey",
+    "source",
+    "signal",
+    "weight"
+  ],
   "properties": {
+    "slot": {
+      "type": "string",
+      "enum": [
+        "Signal"
+      ]
+    },
+    "targetIdentityKey": {
+      "type": "string"
+    },
     "source": {
       "type": "string",
-      "description": "Free-text identifier of the corroboration source (e.g. 'unit-test', 'integration-test', 'reachability-graph', 'documentation-presence')."
+      "description": "Source of the signal (e.g. test-presence, reachability, doc-presence, deployment)."
     },
     "signal": {
       "type": "string",
-      "description": "Concrete signal observed (e.g. 'has-test', 'reachable-from-controller', 'documented-in-readme')."
+      "description": "Free-form signal name."
     },
     "weight": {
       "type": "number",
       "minimum": -1,
-      "maximum": 1,
-      "description": "Signed contribution weight in [-1, 1]. Negative = counter-evidence."
+      "maximum": 1
     },
-    "rationale": { "type": "string" },
-    "supportingInterpretsIds": {
+    "supportingSourceIds": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "Ids of SourceInterpretation contributions this evidence cites."
+      "items": {
+        "type": "string"
+      }
     }
   },
   "additionalProperties": false

@@ -19,8 +19,7 @@
       "type": "string"
     },
     "ascriptionUri": {
-      "type": "string",
-      "description": "DefMan-issued versioned URI of the DRAFT Ascription."
+      "type": "string"
     },
     "registrationStatus": {
       "type": "string",

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/panels/Archetype/v1",
+  "title": "ArchetypeValue",
+  "description": "Value posted onto the Archetype panel (engine-owned, GSM-spine). One Archetype URI per contribution; the panel collects the union over all Application contributions for a given Definition.",
+  "type": "object",
+  "required": [
+    "slot",
+    "targetIdentityKey",
+    "archetypeRef"
+  ],
+  "properties": {
+    "slot": {
+      "type": "string",
+      "enum": [
+        "Application"
+      ]
+    },
+    "targetIdentityKey": {
+      "type": "string",
+      "description": "Definition.identityKey this Archetype applies to."
+    },
+    "archetypeRef": {
+      "type": "string",
+      "description": "Versioned gsmarc:// URI of the Archetype."
+    },
+    "rationale": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/panels/SourceUnit/v1",
+  "title": "SourceUnitValue",
+  "description": "Value posted onto the SourceUnit panel: symbol-level interpretations inside a single language/format unit. Pack-owned. Examples used by the Repository Sourcing Pack: CodeUnit (carries SCIP SymbolInformation), JpaEntity, ProtoMessage, GraphqlSchema, IacResource.",
+  "type": "object",
+  "required": [
+    "slot",
+    "payload",
+    "sourceIdentityKey"
+  ],
+  "properties": {
+    "slot": {
+      "type": "string"
+    },
+    "sourceIdentityKey": {
+      "type": "string",
+      "description": "Stable per-source identity for this unit (e.g. fully-qualified symbol)."
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

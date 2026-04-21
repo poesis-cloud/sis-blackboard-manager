@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/pack-manifest/v1",
+  "title": "SourcingPackManifest",
+  "description": "Manifest for a Sourcing Pack. Declares: the source-side panels the Pack contributes (with their closed slot sets), KS list, optional Instructions Provider, requested external tools (upper bound). Engine validates the panel DAG (engine-owned target panels + Pack-owned source panels) at registration; cycles are rejected.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "instructionsProvider",
+    "panels",
+    "knowledgeSources"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Versioned gsmarc:// URI of the Pack."
+    },
+    "name": {
+      "type": "string"
+    },
+    "instructionsProvider": {
+      "type": "string",
+      "description": "URI of the Pack's Instructions Provider descriptor."
+    },
+    "panels": {
+      "type": "array",
+      "description": "Pack-owned source-side panel declarations. Engine-owned target-spine panels (Definition/Archetype/Statement/Granularity/Evidence/Confidence) MUST NOT appear here.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "valueSchemaRef",
+          "slots",
+          "dependsOnPanels"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "valueSchemaRef": {
+            "type": "string"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Closed contribution-type set (one slot = one panel property)."
+          },
+          "dependsOnPanels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "DAG edges. Engine-owned panel names allowed for upward bridges."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "knowledgeSources": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "URIs of KS descriptors shipped by the Pack."
+    },
+    "requestedExternalTools": {
+      "type": "array",
+      "description": "Upper-bound list of external tools any KS in this Pack may declare in its descriptor's externalTools[]. Operator's RunConfig narrows further by binding names to host paths.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "versionSpec"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "versionSpec": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

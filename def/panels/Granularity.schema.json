@@ -1,21 +1,43 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/Granularity/v1",
-  "title": "Granularity contribution value",
-  "description": "Value type for contributions on the Granularity panel. Each contribution proposes a consolidation decision for the referenced SubjectIdentity, considering peers within the same enclosing Structure. Axis-2 profile (Standard | Coarse | Fine | BoundaryOnly) biases which GranularityKSs are eligible to fire.",
+  "title": "GranularityValue",
+  "description": "Value posted onto the Granularity panel (engine-owned, GSM-spine): consolidation verdict per Definition.",
   "type": "object",
-  "required": ["verdict"],
+  "required": [
+    "slot",
+    "targetIdentityKey",
+    "verdict"
+  ],
   "properties": {
+    "slot": {
+      "type": "string",
+      "enum": [
+        "Verdict"
+      ]
+    },
+    "targetIdentityKey": {
+      "type": "string"
+    },
     "verdict": {
       "type": "string",
-      "enum": ["keep", "drop", "splitInto", "mergeWith"]
+      "enum": [
+        "keep",
+        "drop",
+        "splitInto",
+        "mergeWith"
+      ]
     },
     "targetIdentityKeys": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "For splitInto: identity keys of the target SubjectIdentities to create. For mergeWith: identity keys of the SubjectIdentities to merge into. Empty for keep / drop."
+      "items": {
+        "type": "string"
+      },
+      "description": "Required for splitInto / mergeWith verdicts."
     },
-    "rationale": { "type": "string" }
+    "rationale": {
+      "type": "string"
+    }
   },
   "additionalProperties": false
 }
