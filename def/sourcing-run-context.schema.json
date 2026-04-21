@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/sourcing-run-context/v1",
   "title": "SourcingRunContext",
-  "description": "Off-Blackboard, immutable per-Run context. Built by the Initializer in three deterministic substeps: (1) Instructions Provider returns instructionsPayload + profile + Pack-typed user config; (2) Scope Builder derives scope from profile (engine default; Pack may override); (3) Focus Builder derives focus from scope + RunConfig (engine default; Pack may override). Frozen after Initialization. Read-only access via ControlContext.runContext().",
+  "description": "Immutable per-Run engine state, distinct from the Blackboard. Built by the Initializer in three deterministic substeps: (1) Instructions Provider returns instructionsPayload + profile + Pack-typed user config; (2) Scope Builder derives scope from profile (engine default; Pack may override); (3) Focus Builder derives focus from scope + RunConfig (engine default; Pack may override). Frozen after Initialization, before the Blackboard Builder substep stands up the panels. Read-only access via ControlContext.runContext().",
   "type": "object",
   "required": [
     "runId",

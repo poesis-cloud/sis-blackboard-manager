@@ -125,7 +125,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
   Statement --> Evidence
   Evidence --> Confidence
 
-  package "Off-Blackboard" as OBB <<Frame>> {
+  package "Engine run state\n(distinct from the Blackboard)" as ERS <<Frame>> {
     class SourcingRunContext <<immutable>> {
       runId
       profile
@@ -139,7 +139,9 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       externalToolBindings
       ----
       built by Initializer in
-      3 substeps; frozen for the Run;
+      3 substeps; frozen for the Run
+      BEFORE the Blackboard Builder
+      substep stands up the panels;
       read by all KSs via
       controlContext.runContext()
     }

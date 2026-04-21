@@ -29,7 +29,7 @@ participant "Initializer" as Init
 participant "Plug-in Loader" as PL
 participant "Instructions\nProvider (Pack)" as IP
 participant "Scope/Focus\nBuilders" as SF
-participant "SourcingRunContext\n(off-Blackboard)" as RC
+participant "SourcingRunContext\n(immutable per Run;\nengine run state)" as RC
 participant "Control" as Ctrl
 participant "Blackboard\n(panels)" as BB
 participant "Resolver" as Res
@@ -43,27 +43,34 @@ participant "DefManClient" as DM
 participant "BundleStore" as BS
 participant "RunLedger" as RL
 
-== Initialization (no KS runs yet) ==
+== Initialization (canonical step) ==
 
 Op -> API : POST /runs RunConfig\n{sourcingPacks[], profile,\n instructionsPayload,\n externalToolBindings,\n resolverOverrides, runInvariants,\n checkpoints}
 API -> Init : startRun(runId, runConfig)
-Init -> PL : load Packs (sandboxed classloaders)
-Init -> IP : provide(InstructionsContext{runConfig.instructionsPayload})
-IP -> BS : (optional) write source artefacts\n(e.g. clone repo, snapshot)
-IP --> Init : InstructionsResult{instructionsPayload, profile}
-Init -> SF : buildScope(profile) ; buildFocus(scope, runConfig)
-SF --> Init : scope, focus
-Init -> RC : freeze(SourcingRunContext)
-Init -> BB : declare panels\n(engine target spine + Pack source-side)
+
+group Initializer substeps
+  Init -> PL : load Packs (sandboxed classloaders)
+  Init -> IP : provide(InstructionsContext{runConfig.instructionsPayload})
+  IP -> BS : (optional) write source artefacts\n(e.g. clone repo, snapshot)
+  IP --> Init : InstructionsResult{instructionsPayload, profile}
+  Init -> SF : buildScope(profile) ; buildFocus(scope, runConfig)
+  SF --> Init : scope, focus
+  Init -> RC : freeze(SourcingRunContext)
+  Init -> BB : Blackboard Builder substep\n(declare engine target spine\n + Pack source-side panels from manifest;\n validate panel DAG;\n instantiate empty panels)
+end
+
 Init -> RL : record Run START
 
-== Blackboard convergence loop (data-driven) ==
+== Activation + Execution + Conflict Resolution + Iteration (canonical loop) ==
 
 loop until quiescence OR maxIterations
 
+  ' --- Activation: Control selects eligible KSs based on current Blackboard state ---
   Ctrl -> BB : query state
-  Ctrl -> Ctrl : enumerate eligible KSs\n(triggerPredicate true)
-  Ctrl -> KSs : fire eligible KSs (parallelSafe in parallel)
+  Ctrl -> Ctrl : Activation:\n  enumerate eligible KSs\n  (triggerPredicate true)
+
+  ' --- Execution: activated KSs read inputs and post Contributions ---
+  Ctrl -> KSs : Execution:\n  fire eligible KSs\n  (parallelSafe in parallel)
 
   alt DiscoveryKS fires
     KSs -> ExtT : execve scip-* / syft / tokei (sandboxed)
@@ -104,9 +111,11 @@ loop until quiescence OR maxIterations
     KSs -> BB : post Contribution(panel=Confidence, slot=Score)
   end
 
-  Ctrl -> Res : reconcile per-panel
+  ' --- Conflict Resolution: per-panel ContributionResolver reconciles competing contributions ---
+  Ctrl -> Res : Conflict Resolution:\n  reconcile per-panel
   Res -> BB : update resolved view
 
+  ' --- Iteration: loop continues until quiescence or maxIterations ---
 end
 
 == Checkpoint-A (governance overlay; optional) ==

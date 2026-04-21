@@ -26,7 +26,7 @@ frame "PD - GSM Sourcer - System overview" {
 
   package "GSM Sourcer engine\n(IT-domain agnostic, owns the meta-model + GSM target spine)" as Engine {
     component "Sourcer API\n(POST /runs)" as API
-    component "Initializer\n(builds SourcingRunContext\nin 3 substeps; stands up Blackboard)" as Init
+    component "Initializer\n(substeps: Plug-in Loader,\n Instructions Provider invocation,\n Scope Builder, Focus Builder,\n freeze SourcingRunContext,\n Blackboard Builder)" as Init
     component "Control\n(panel-DAG-aware scheduler;\nfires KSs whose triggerPredicate\nholds against Blackboard state)" as Ctrl
     component "Blackboard\n(Source group + Target group panels;\nhypothesis-only)" as BB
     component "ContributionResolver\n(per-panel; default + RunConfig overrides)" as Res
@@ -49,7 +49,7 @@ frame "PD - GSM Sourcer - System overview" {
   Op --> API
   API --> Init
   Init --> IP : invoke once\n(returns instructionsPayload + profile)
-  Init --> BB : declare panels (engine + Pack)
+  Init --> BB : Blackboard Builder substep\n(declare engine target spine\n + Pack source-side panels;\n validate panel DAG;\n instantiate empty panels)
   Init --> Ctrl : start
   Ctrl --> KS : fire eligible KSs
   KS --> BB : post Contribution(panel, slot, value)

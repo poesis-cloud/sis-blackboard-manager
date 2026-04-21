@@ -25,10 +25,11 @@ frame "PD - GSM Sourcer - Component view" {
   }
 
   package "Initialization" as INIT_PKG {
-    component "Initializer" as Init
+    component "Initializer\n(orchestrates substeps below;\nfreezes SourcingRunContext;\nstarts Control)" as Init
     component "Plug-in Loader\n(sandboxed classloader per Pack)" as Loader
     component "Scope Builder\n(engine default; Pack may override)" as ScopeB
     component "Focus Builder\n(engine default; Pack may override)" as FocusB
+    component "Blackboard Builder\n(declares panels:\n  engine-owned target spine\n  + Pack-owned source-side\n    from pack-manifest;\n validates panel DAG;\n instantiates empty panels)" as BBBuild
   }
 
   package "Control" as CTRL_PKG {
@@ -43,8 +44,8 @@ frame "PD - GSM Sourcer - Component view" {
     component "Target Panels\n(Definition, Archetype, Statement,\nGranularity, Evidence, Confidence)" as BB_TGT
   }
 
-  package "Off-Blackboard run state" as RC_PKG {
-    component "SourcingRunContext\n(immutable per Run)" as RC
+  package "Engine run state\n(distinct from the Blackboard)" as RC_PKG {
+    component "SourcingRunContext\n(immutable per Run;\nfrozen by Initializer\nbefore Blackboard Builder runs)" as RC
     component "RunConfig\n(operator input)" as RCfg
   }
 
@@ -82,6 +83,9 @@ frame "PD - GSM Sourcer - Component view" {
   ScopeB --> RC
   FocusB --> RC
   Init --> RC : freeze
+  Init --> BBBuild : after RC freeze
+  BBBuild --> BB_SRC : declare + instantiate
+  BBBuild --> BB_TGT : declare + instantiate
   Init --> Ctrl : start
   Init --> BS : initial snapshot
 
