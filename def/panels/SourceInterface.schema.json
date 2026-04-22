@@ -2,15 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/SourceInterface/v1",
   "title": "SourceInterfaceValue",
-  "description": "Value posted onto the SourceInterface panel: externally observable contracts of the IT-system under analysis. Pack-owned. Examples used by the Repository Sourcing Pack: OpenApiOperation, KafkaTopic, DbTable, TestSpec.",
+  "description": "Reference aggregate value template for the SourceInterface panel: externally observable contracts of the IT-system under analysis. Pack-owned. Examples used by the Repository Sourcing Pack: OpenApiOperation, KafkaTopic, DbTable, TestSpec. Operational form: the Pack declares per-contribution-type value schemas in `pack-manifest.panels[].contributionTypes`; this file documents the shared envelope.",
   "type": "object",
   "required": [
-    "slot",
+    "contributionType",
     "sourceIdentityKey",
     "payload"
   ],
   "properties": {
-    "slot": {
+    "contributionType": {
       "type": "string"
     },
     "sourceIdentityKey": {

@@ -1,23 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gsmarc://gsm-sourcer/panels/Confidence/v1",
-  "title": "ConfidenceValue",
-  "description": "Value posted onto the Confidence panel (engine-owned, GSM-spine): synthesized confidence score for a target panel decision.",
+  "$id": "gsmarc://gsm-sourcer/panels/Confidence/Score/v1",
+  "title": "ConfidenceScoreValue",
+  "description": "Value of a Contribution posted onto the Confidence panel with contributionType = Score. Synthesized confidence score for a target panel decision.",
   "type": "object",
   "required": [
-    "slot",
     "targetIdentityKey",
     "targetPanel",
     "score",
     "method"
   ],
   "properties": {
-    "slot": {
-      "type": "string",
-      "enum": [
-        "Score"
-      ]
-    },
     "targetIdentityKey": {
       "type": "string"
     },

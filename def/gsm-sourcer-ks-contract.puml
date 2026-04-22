@@ -36,7 +36,7 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
                                       EvidenceCollectionKS |
                                       ConfidenceSynthesisKS)
     writesPanel : String             (panel name; one)
-    writesSlots : List<String>
+    writesContributionTypes : List<String>
     readsPanels : List<String>       (subset of dependsOnPanels*)
     triggerPredicate : Class<? extends KsTriggerPredicate>
                                      (FQN of a Java class)
@@ -83,7 +83,7 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
   interface BlackboardView <<read-only>> {
     +Optional<Object> resolved(String panelName, String identityKey)
     +List<Contribution> contributionsOf(String panelName, String identityKey)
-    +List<Contribution> contributionsOfSlot(String panelName, String slot)
+    +List<Contribution> contributionsOfContributionType(String panelName, String contributionType)
     +boolean contributedBy(URI ksId, String identityKey)
     +int evidenceCount(String identityKey)
     +void post(Contribution c)
@@ -92,7 +92,7 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
   class Contribution <<wire>> {
     id : String
     panel : String                   (panel name)
-    slot : String
+    contributionType : String
     targetIdentityKey : String?
     value : Object
     contributorKsId : URI            (engine-set)
@@ -135,7 +135,7 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
     Per-identity:
       view.resolved(panelName, identityKey)
       view.contributionsOf(panelName, identityKey)
-      view.contributionsOfSlot(panelName, slot)
+      view.contributionsOfContributionType(panelName, contributionType)
       view.contributedBy(thisKsId, identityKey)
       view.evidenceOf(identityKey).size()
       ctx.scope().includes(identityKey)

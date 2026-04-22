@@ -1,23 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gsmarc://gsm-sourcer/panels/Statement/v1",
-  "title": "StatementValue",
-  "description": "Value posted onto the Statement panel (engine-owned, GSM-spine): populated GSM statement payload conforming to the resolved archetype JSON Schema. Default ContributionResolver = `compose`: per-key merge of the inner `statement` object across competing contributions, so multiple StatementShapingKSs can populate disjoint archetype fields cooperatively (each KS posts a partial statement; engine assembles the union).",
+  "$id": "gsmarc://gsm-sourcer/panels/Statement/Draft/v1",
+  "title": "StatementDraftValue",
+  "description": "Value of a Contribution posted onto the Statement panel with contributionType = Draft. Carries a populated GSM statement payload conforming to the resolved archetype JSON Schema. Default ContributionResolver = `compose`: per-key merge of the inner `statement` object across competing Draft contributions, so multiple StatementShapingKSs can populate disjoint archetype fields cooperatively (each KS posts a partial statement; engine assembles the union).",
   "type": "object",
   "required": [
-    "slot",
     "targetIdentityKey",
     "statement",
     "completeness",
     "shapingMethod"
   ],
   "properties": {
-    "slot": {
-      "type": "string",
-      "enum": [
-        "Draft"
-      ]
-    },
     "targetIdentityKey": {
       "type": "string"
     },

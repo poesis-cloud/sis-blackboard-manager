@@ -49,7 +49,7 @@ frame "UC - GSM Sourcer" {
 
   package "Pack management" {
     usecase "Author Sourcing Pack\n(Instructions Provider +\nsource-side panels +\nKSs)" as UC_Author
-    usecase "Declare KS descriptor\n(panel, slots, trigger,\nbudgets, resolverHint,\nexternalTools)" as UC_Declare
+    usecase "Declare KS descriptor\n(panel, contribution types, trigger,\nbudgets, resolverHint,\nexternalTools)" as UC_Declare
     usecase "Publish Pack\n(versioned URI)" as UC_Publish
     usecase "Approve Pack\n(R6 end-state: as Definition)" as UC_Approve
   }
@@ -79,10 +79,10 @@ frame "UC - GSM Sourcer" {
   note right of UC_Author
     A Pack ships an Instructions Provider (Pack-typed
     payload), source-side panel declarations
-    (name + value schema + slots + dependsOnPanels), and
-    KS descriptors. Pack also declares
-    requestedExternalTools[] (upper bound). All KSs are
-    Java JARs; KSs are unaware of each other.
+    (name + per-contribution-type value schemas +
+    dependsOnPanels), and KS descriptors. Pack also
+    declares requestedExternalTools[] (upper bound).
+    All KSs are Java JARs; KSs are unaware of each other.
   end note
 
   note right of UC_Snap

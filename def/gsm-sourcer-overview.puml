@@ -52,7 +52,7 @@ frame "PD - GSM Sourcer - System overview" {
   Init --> BB : Blackboard Builder substep\n(declare engine target spine\n + Pack source-side panels;\n validate panel DAG;\n instantiate empty panels)
   Init --> Ctrl : start
   Ctrl --> KS : fire eligible KSs
-  KS --> BB : post Contribution(panel, slot, value)
+  KS --> BB : post Contribution(panel, contributionType, value)
   KS --> Inf : optional
   KS --> DefExp : optional (read-only)
   KS --> Tools : execve (sandboxed)
@@ -77,9 +77,10 @@ frame "PD - GSM Sourcer - System overview" {
 
   note bottom of Pack
     Pack ships: an Instructions Provider, source-side panel declarations
-    (panel name + slot set + value schema + dependsOnPanels), and a set of
-    KS descriptors. The Pack also declares requestedExternalTools[] (upper
-    bound). The operator's RunConfig narrows tool bindings.
+    (panel name + closed contribution-type set with per-type value schemas
+    + dependsOnPanels), and a set of KS descriptors. The Pack also declares
+    requestedExternalTools[] (upper bound). The operator's RunConfig
+    narrows tool bindings.
   end note
 }
 

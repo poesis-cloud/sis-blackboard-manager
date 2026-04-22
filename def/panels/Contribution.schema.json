@@ -7,7 +7,7 @@
   "required": [
     "id",
     "panel",
-    "slot",
+    "contributionType",
     "value",
     "contributorKsId",
     "kind",
@@ -33,20 +33,20 @@
         "Confidence"
       ]
     },
-    "slot": {
+    "contributionType": {
       "type": "string",
-      "description": "Slot name within `panel` (one of the panel's closed contribution-type set)."
+      "description": "Contribution-type name within `panel` (one of the keys of the panel's closed `contributionTypes` map). Engine validates `value` against the JSON Schema bound to this key."
     },
     "targetIdentityKey": {
       "type": [
         "string",
         "null"
       ],
-      "description": "Required for target-group panels (Archetype/Statement/Granularity/Evidence/Confidence) and for Definition Merge slots referencing prior identities. Null for source-group panels."
+      "description": "Required for target-group panels (Archetype/Statement/Granularity/Evidence/Confidence) and for Definition Merge contribution types referencing prior identities. Null for source-group panels."
     },
     "value": {
       "type": "object",
-      "description": "Panel-specific value (validated against the panel's value schema)."
+      "description": "Panel-specific value (validated against the JSON Schema bound to `contributionType` in the panel's contributionTypes map)."
     },
     "contributorKsId": {
       "type": "string",

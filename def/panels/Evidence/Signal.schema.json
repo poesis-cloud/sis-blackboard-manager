@@ -1,23 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gsmarc://gsm-sourcer/panels/Evidence/v1",
-  "title": "EvidenceValue",
-  "description": "Value posted onto the Evidence panel (engine-owned, GSM-spine): additive corroboration per Definition. Resolver default = collectAll.",
+  "$id": "gsmarc://gsm-sourcer/panels/Evidence/Signal/v1",
+  "title": "EvidenceSignalValue",
+  "description": "Value of a Contribution posted onto the Evidence panel with contributionType = Signal. Additive corroboration per Definition. Default ContributionResolver = collectAll.",
   "type": "object",
   "required": [
-    "slot",
     "targetIdentityKey",
     "source",
     "signal",
     "weight"
   ],
   "properties": {
-    "slot": {
-      "type": "string",
-      "enum": [
-        "Signal"
-      ]
-    },
     "targetIdentityKey": {
       "type": "string"
     },

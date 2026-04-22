@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/pack-manifest/v1",
   "title": "SourcingPackManifest",
-  "description": "Manifest for a Sourcing Pack. Declares: the source-side panels the Pack contributes (with their closed slot sets), optional additive slots the Pack adds onto engine-owned target panels, KS list, optional Instructions Provider, requested external tools (upper bound). Engine validates the panel DAG (engine-owned target panels + Pack-owned source panels + Pack extension slots) at registration; cycles are rejected. Pack-owned source-panel names SHOULD be Pack-namespaced (e.g. `itip:SourceUnit`); when two Packs in the same Run declare the same panel name with non-identical valueSchemaRef OR non-identical slots, the engine rejects registration (collision). Identical panel declarations across Packs are merged silently (same name + same valueSchemaRef + same slots).",
+  "description": "Manifest for a Sourcing Pack. Declares: the source-side panels the Pack contributes (each with a closed map of contribution-type names to per-type JSON Schema URIs), optional additive contribution types the Pack adds onto engine-owned target panels (also as a name -> schema-URI map), KS list, optional Instructions Provider, requested external tools (upper bound). Engine validates the panel DAG (engine-owned target panels + Pack-owned source panels + Pack contribution-type extensions) at registration; cycles are rejected. Pack-owned source-panel names SHOULD be Pack-namespaced (e.g. `itip:SourceUnit`); when two Packs in the same Run declare the same panel name with non-identical `contributionTypes` map, the engine rejects registration (collision). Identical panel declarations across Packs are merged silently.",
   "type": "object",
   "required": [
     "id",
@@ -25,30 +25,27 @@
     },
     "panels": {
       "type": "array",
-      "description": "Pack-owned source-side panel declarations. Engine-owned target-spine panels (Definition/Archetype/Statement/Granularity/Evidence/Confidence) MUST NOT appear here; use `extendsPanels` to add additive slots onto them.",
+      "description": "Pack-owned source-side panel declarations. Engine-owned target-spine panels (Definition/Archetype/Statement/Granularity/Evidence/Confidence) MUST NOT appear here; use `extendsPanels` to add additive contribution types onto them.",
       "items": {
         "type": "object",
         "required": [
           "name",
-          "valueSchemaRef",
-          "slots",
+          "contributionTypes",
           "dependsOnPanels"
         ],
         "properties": {
           "name": {
             "type": "string",
-            "description": "Pack-namespaced panel name. SHOULD match `<packPrefix>:<PanelName>` (e.g. `itip:SourceUnit`); engine collision-rejects identical names with non-identical schema/slots across Packs."
+            "description": "Pack-namespaced panel name. SHOULD match `<packPrefix>:<PanelName>` (e.g. `itip:SourceUnit`); engine collision-rejects identical names with non-identical contributionTypes maps across Packs."
           },
-          "valueSchemaRef": {
-            "type": "string",
-            "description": "Versioned gsmarc:// URI of the panel value JSON Schema. Resolution rule: engine looks up the schema first as a resource bundled in the Pack JAR at `/META-INF/gsmarc/<URI-path-tail>`; falls back to the configured Schema Registry if any. The URI is informational + cache key; no network fetch is implied."
-          },
-          "slots": {
-            "type": "array",
-            "items": {
-              "type": "string"
+          "contributionTypes": {
+            "type": "object",
+            "description": "Closed map binding each contribution-type name accepted by this panel to the versioned `gsmarc://` URI of the JSON Schema that every Contribution.value of that type MUST satisfy. One entry = one contribution type. Resolution rule: engine looks up each schema as a resource bundled in the Pack JAR at `/META-INF/gsmarc/<URI-path-tail>`; falls back to the configured Schema Registry if any. The URI is informational + cache key; no network fetch is implied.",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Versioned gsmarc:// URI of the per-contribution-type JSON Schema."
             },
-            "description": "Closed contribution-type set (one slot = one panel property)."
+            "minProperties": 1
           },
           "dependsOnPanels": {
             "type": "array",
@@ -63,12 +60,15 @@
     },
     "extendsPanels": {
       "type": "object",
-      "description": "Optional additive slots the Pack registers onto engine-owned panels (Definition/Archetype/Statement/Granularity/Evidence/Confidence). Slot names MUST be Pack-namespaced (e.g. `itip:Refined`); engine-defined slots remain closed and cannot be redefined. Use case: a domain Pack augments Statement with a refinement slot that downstream domain KSs read alongside the engine-defined Draft slot.",
+      "description": "Optional additive contribution types the Pack registers onto engine-owned panels (Definition/Archetype/Statement/Granularity/Evidence/Confidence). Each value is a map binding a Pack-namespaced contribution-type name (e.g. `itip:Refined`) to the versioned gsmarc:// URI of its JSON Schema. Engine-defined contribution types remain closed and cannot be redefined. Use case: a domain Pack augments Statement with a refinement contribution type that downstream domain KSs read alongside the engine-defined Draft type.",
       "additionalProperties": {
-        "type": "array",
-        "items": {
-          "type": "string",
+        "type": "object",
+        "propertyNames": {
           "pattern": "^[a-z][a-z0-9]*:[A-Za-z][A-Za-z0-9_]*$"
+        },
+        "additionalProperties": {
+          "type": "string",
+          "description": "Versioned gsmarc:// URI of the per-contribution-type JSON Schema."
         }
       }
     },
