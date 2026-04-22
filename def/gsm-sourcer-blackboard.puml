@@ -48,7 +48,10 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     therefore models every panel — engine-owned target panel and
     Pack-owned source panel alike — as one immutable Java record
     `Panel` with fields `(name, kind, contributionTypes,
-    defaultResolver, dependsOnPanels)`. There is no class hierarchy,
+    dependsOnPanels)`, where `contributionTypes` maps each
+    contribution-type name to a `ContributionTypeSpec` carrying the
+    per-type JSON Schema URI and `defaultResolver`. There is no
+    class hierarchy,
     no abstract `SourceAnalysisPanel`, no abstract
     `TargetDefinitionPanel`, no per-panel concrete subclass.
     Differentiation is by the `kind` field, not by Java type.
@@ -159,9 +162,13 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
   class Panel <<engine,record>> {
     +name: String
     +kind: PanelKind
-    +contributionTypes: Map<String, URI>
-    +defaultResolver: ContributionResolver
+    +contributionTypes: Map<String, ContributionTypeSpec>
     +dependsOnPanels: List<String>
+  }
+
+  class ContributionTypeSpec <<engine,record>> {
+    +schemaUri: URI
+    +defaultResolver: ContributionResolver
   }
 
   note bottom of Panel
@@ -173,17 +180,20 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     - A Panel has no behaviour. It is the metadata the engine needs
       to (a) accept Contributions into the right typed region, (b)
       validate them against the per-contribution-type JSON Schema
-      bound in `contributionTypes`, (c) resolve conflicts with the
-      right strategy, (d) walk the panel DAG.
+      bound in `contributionTypes[ct].schemaUri`, (c) resolve
+      conflicts with the per-contribution-type strategy bound in
+      `contributionTypes[ct].defaultResolver`, (d) walk the panel
+      DAG.
     - Both engine-owned (target) and Pack-owned (source) panels are
       instances of THIS record. The engine ships no panel base class
       and no per-panel subclass. Differentiation is by `kind`
       (SOURCE_ANALYSIS vs TARGET_DEFINITION) as data; ownership
       (engine vs Pack) is derived from `kind`.
     - A Panel declares a CLOSED map of contribution-type names →
-      JSON Schema URIs at registration time. One contribution type
-      = one entry in `contributionTypes`; one Contribution belongs
-      to exactly one `(panel, contributionType)` pair.
+      `ContributionTypeSpec` records at registration time. One
+      contribution type = one entry in `contributionTypes`; one
+      Contribution belongs to exactly one `(panel, contributionType)`
+      pair.
     - The Panel knows its place in the engine-validated panel DAG
       via `dependsOnPanels`. The DAG is validated for acyclicity and
       cross-DAG-read containment at Pack registration.
@@ -202,15 +212,17 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       (TARGET_DEFINITION ⇒ engine-owned and sealed;
       SOURCE_ANALYSIS ⇒ Pack-owned).
     - `contributionTypes`: closed map binding each accepted
-      contribution-type name to the versioned `gsmarc://` URI of the
-      JSON Schema that every `Contribution.value` of that type MUST
-      satisfy. Engine-defined entries on engine-owned panels are
-      sealed. Packs MAY add Pack-namespaced additive entries via
+      contribution-type name to a `ContributionTypeSpec` carrying:
+      - `schemaUri`: versioned `gsmarc://` URI of the JSON Schema
+        that every `Contribution.value` of that type MUST satisfy.
+      - `defaultResolver`: the `ContributionResolver` strategy used
+        to fold competing Contributions of THIS type within this
+        panel. RunConfig may override per `(panel, contributionType)`.
+      Engine-defined entries on engine-owned panels are sealed.
+      Packs MAY add Pack-namespaced additive entries via
       `pack-manifest.extendsPanels[]`. Schema URIs resolve to
       resources bundled in the engine or Pack JAR at
       `/META-INF/gsmarc/<URI-tail>`.
-    - `defaultResolver`: panel-default `ContributionResolver`.
-      RunConfig may override per panel.
     - `dependsOnPanels`: panel-DAG edges. Engine-owned panel names
       are allowed for upward bridges from source to target.
 
@@ -268,13 +280,17 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       the same `dependsOnPanels` set AND the same downstream
       readers as an existing panel, it is a contribution type of
       that panel.
-    - **P-3 [GSM-S] Resolver granularity**: GSM Sourcer attaches
-      the resolver at panel granularity (`defaultResolver` is one
-      per `Panel`; RunConfig overrides apply per panel, not per
-      contribution type). This is an engineering choice, not a
-      Hearsay-II principle. Consequence: if the candidate aspect
-      needs a different resolution strategy than the rest of the
-      panel, it MUST be its own panel.
+    - **P-3 [GSM-S] Resolver granularity (DISSOLVED 2026-04)**:
+      previously, GSM Sourcer attached the resolver at panel
+      granularity, which forced any aspect needing a different
+      resolution strategy to become its own panel — a structural
+      tension with P-2 (same-DAG-position aspects must share the
+      panel). The resolver is now attached PER
+      `(panel, contributionType)` via
+      `contributionTypes[ct].defaultResolver`, with RunConfig
+      override key `resolvers."<Panel>.<ContributionType>"`. P-3 no
+      longer constrains panel-vs-type decisions. Retained as a
+      named ID for traceability; effectively a no-op rule.
     - **P-4 [OVL] Override cascade boundary**: a USER_OVERRIDE on
       any contribution type of a panel cascades to the panel's
       DAG-downstream consumers under one common cascade rule (per
@@ -294,10 +310,12 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     - **Type-as-panel** (P-1/P-2 violation): splitting one logical
       level into N panels with identical DAG positions, fragmenting
       the resolved view and forcing readers to do N-way joins.
-    - **Panel-as-type** (P-1/P-3 violation): folding a distinct
+    - **Panel-as-type** (P-1 violation): folding a distinct
       abstraction level into a contribution type of an existing
       panel, hiding it from the DAG and denying its readers the
-      ability to subscribe independently.
+      ability to subscribe independently. (Pre-2026-04 this was
+      also a P-3 violation; with P-3 dissolved, only P-1 still
+      catches it.)
   end note
 
   enum PanelKind {
@@ -341,9 +359,10 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     object "Definition : Panel" as DefinitionPanel {
       name = "Definition"
       kind = TARGET_DEFINITION
-      contributionTypes[Claim] = gsmarc://gsm-sourcer/panels/Definition/Claim/v1
-      contributionTypes[Merge] = gsmarc://gsm-sourcer/panels/Definition/Merge/v1
-      defaultResolver = highestConfidence
+      contributionTypes[Claim].schemaUri = gsmarc://gsm-sourcer/panels/Definition/Claim/v1
+      contributionTypes[Claim].defaultResolver = highestConfidence
+      contributionTypes[Merge].schemaUri = gsmarc://gsm-sourcer/panels/Definition/Merge/v1
+      contributionTypes[Merge].defaultResolver = collectAll
       dependsOnPanels = []
     }
 
@@ -365,7 +384,9 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
           identities describe the same subject. `value` carries
           `supersedesIdentityKeys` (non-empty) and a surviving
           `targetIdentityKey`.
-      - Default resolver: `highestConfidence`. Equally-confident
+      - Default resolvers (per contribution type): `Claim` →
+        `highestConfidence`, `Merge` → `collectAll`. Equally-
+        confident
         `Claim`s on the same surface key escalate to a Checkpoint via
         a `failOnConflict` / `userMediated` RunConfig override.
 
@@ -391,8 +412,8 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     object "Archetype : Panel" as ArchetypePanel {
       name = "Archetype"
       kind = TARGET_DEFINITION
-      contributionTypes[Application] = gsmarc://gsm-sourcer/panels/Archetype/Application/v1
-      defaultResolver = collectAll
+      contributionTypes[Application].schemaUri = gsmarc://gsm-sourcer/panels/Archetype/Application/v1
+      contributionTypes[Application].defaultResolver = collectAll
       dependsOnPanels = [Definition]
     }
 
@@ -406,7 +427,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
         - `Application` — an `ArchetypeKS` posts one archetype
           reference per Contribution. `value` carries `archetypeRef`
           (versioned `gsmarc://` URI of the GSM Archetype Definition).
-      - Default resolver: `collectAll` (union over Applications). The
+      - Default resolver (`Application`): `collectAll` (union over Applications). The
         Pipeline reads the union as the resolved archetype set for
         the Definition.
 
@@ -422,8 +443,8 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     object "Statement : Panel" as StatementPanel {
       name = "Statement"
       kind = TARGET_DEFINITION
-      contributionTypes[Draft] = gsmarc://gsm-sourcer/panels/Statement/Draft/v1
-      defaultResolver = compose
+      contributionTypes[Draft].schemaUri = gsmarc://gsm-sourcer/panels/Statement/Draft/v1
+      contributionTypes[Draft].defaultResolver = compose
       dependsOnPanels = [Archetype]
     }
 
@@ -440,7 +461,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
           archetype-typed payload), `completeness` (`partial` |
           `full`), and `shapingMethod` (free-form classifier such as
           `structural-extraction`, `llm-completion`).
-      - Default resolver: `compose`. Multiple StatementShapingKSs may
+      - Default resolver (`Draft`): `compose`. Multiple StatementShapingKSs may
         post Contributions populating disjoint archetype fields; the
         engine's schema-driven per-key merge assembles the union into
         the resolved Statement. This is the panel-level realisation
@@ -460,8 +481,8 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     object "Granularity : Panel" as GranularityPanel {
       name = "Granularity"
       kind = TARGET_DEFINITION
-      contributionTypes[Verdict] = gsmarc://gsm-sourcer/panels/Granularity/Verdict/v1
-      defaultResolver = highestConfidence
+      contributionTypes[Verdict].schemaUri = gsmarc://gsm-sourcer/panels/Granularity/Verdict/v1
+      contributionTypes[Verdict].defaultResolver = highestConfidence
       dependsOnPanels = [Statement]
     }
 
@@ -496,8 +517,8 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     object "Evidence : Panel" as EvidencePanel {
       name = "Evidence"
       kind = TARGET_DEFINITION
-      contributionTypes[Signal] = gsmarc://gsm-sourcer/panels/Evidence/Signal/v1
-      defaultResolver = collectAll
+      contributionTypes[Signal].schemaUri = gsmarc://gsm-sourcer/panels/Evidence/Signal/v1
+      contributionTypes[Signal].defaultResolver = collectAll
       dependsOnPanels = [Statement]
     }
 
@@ -514,7 +535,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
           `value.evidenceKind` is a free-form classifier
           (`test-pass`, `test-fail`, `interface-coherence`,
           `relation-density`, ...). Additive — every Signal counts.
-      - Default resolver: `collectAll`. The resolved view is the
+      - Default resolver (`Signal`): `collectAll`. The resolved view is the
         full list of Signals; `ConfidenceSynthesisKS` reads the list
         via `BlackboardView.contributionsOf(...)` (NOT `resolved`)
         to compute a Confidence Score.
@@ -523,8 +544,8 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     object "Confidence : Panel" as ConfidencePanel {
       name = "Confidence"
       kind = TARGET_DEFINITION
-      contributionTypes[Score] = gsmarc://gsm-sourcer/panels/Confidence/Score/v1
-      defaultResolver = highestConfidence
+      contributionTypes[Score].schemaUri = gsmarc://gsm-sourcer/panels/Confidence/Score/v1
+      contributionTypes[Score].defaultResolver = highestConfidence
       dependsOnPanels = [Evidence]
     }
 
@@ -541,7 +562,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
           Contribution per identity. `value.score ∈ [0, 1]`;
           `value.targetPanel` ∈ {Definition, Archetype, Statement,
           Granularity}.
-      - Default resolver: `highestConfidence`. The Pipeline's
+      - Default resolver (`Score`): `highestConfidence`. The Pipeline's
         Validation stage MAY require a minimum Score per identity
         before producing a `ValidatedAscriptionDraft`.
       - `BlackboardView` exposes a Java accessor
