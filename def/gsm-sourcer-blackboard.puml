@@ -10,157 +10,872 @@ skinparam ArrowColor #57606A
 skinparam DefaultFontName "SansSerif"
 skinparam backgroundColor #FFFFFF
 
-skinparam class {
-  BackgroundColor #FFFFFF
-  BorderColor #57606A
-  FontColor #24292F
-}
 skinparam packageStyle rectangle
 skinparam packageBackgroundColor #F6F8FA
 skinparam packageBorderColor #57606A
+
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #57606A
+skinparam classFontColor #24292F
+
 skinparam noteBackgroundColor #FFF8C5
 skinparam noteBorderColor #57606A
 
 frame "CD - GSM Sourcer - Blackboard panel topology" {
 
-  package "Source Panels Group (Pack-owned)" as SRC {
-    class SourceInventory <<panel>> {
-      slots:
-      FileTreeNode
-      GitCommit
-      ModuleSpec
-      LanguageClassification
-      FileMetrics
-      SbomComponent
-      ConfigEntry
-    }
-    class SourceUnit <<panel>> {
-      slots:
-      CodeUnit          (SCIP SymbolInformation)
-      JpaEntity
-      ProtoMessage
-      GraphqlSchema
-      IacResource
-    }
-    class SourceRelation <<panel>> {
-      slots:
-      SymbolRef         (from SCIP occurrences)
-      TypeHierarchyEdge (from SCIP relationships)
-      ImplementationEdge
-      ImportEdge
-      CallEdge          (from Joern CPG)
-      DataflowEdge      (from Joern CPG)
-      DeploymentEdge
-    }
-    class SourceInterface <<panel>> {
-      slots:
-      OpenApiOperation
-      KafkaTopic
-      DbTable
-      TestSpec
-    }
+  ' ============================================================
+  ' BLACKBOARD NOTE
+  ' ============================================================
+
+  note as BlackboardNote
+    **Blackboard — Shared problem-solving workspace (engine-owned)**
+
+    The Blackboard is the GSM Sourcer realisation of the canonical
+    Blackboard pattern's "shared memory". It is a strictly typed,
+    panel-graph-aware data structure on which independent Knowledge
+    Sources (KSs) post **Contributions** under the supervision of the
+    Sourcer Controller. The Controller is **panel-graph-agnostic in
+    semantics** — it knows only the declared DAG and the trigger DSL,
+    not what any panel means.
+
+    **Dependency-inversion boundary (DIP)**: the Sourcer Controller
+    depends on three engine-owned abstractions only — `Panel`,
+    `SourceAnalysisPanel`, `TargetDefinitionPanel`. Concrete source
+    analysis panels live in domain Sourcing Packs (e.g. ITIP's
+    Repository Sourcing Pack defines `SourceInventory`, `SourceUnit`,
+    `SourceRelation`, `SourceInterface`). Concrete target definition
+    panels live here in the engine (the GSM spine). The Controller can
+    schedule Knowledge Sources, evaluate trigger predicates, and
+    reconcile contributions without ever importing a concrete
+    `SourceAnalysisPanel` subclass.
+
+    ====
+
+    **Two panel groups**
+
+    1. **Source analysis panels** (Pack-owned). Capture the source-side
+       analysis of the artefact under sourcing — files, units,
+       relations, interfaces. Each Pack ships its own concrete subclasses
+       of `SourceAnalysisPanel`. The engine ships ONLY the abstract base
+       class and a placeholder group on this diagram. The Repository
+       Sourcing Pack class diagram (in `itip/`) holds the four concrete
+       subclasses currently defined.
+    2. **Target definition panels** (engine-owned). Carry the GSM spine
+       — Definition, Archetype, Statement, Granularity, Evidence,
+       Confidence. They are sealed: tenants MAY add Pack-namespaced
+       additive contribution types via `pack-manifest.extendsPanels` but
+       MAY NOT redefine engine-defined contribution types or add new
+       target panels at runtime.
+
+    ====
+
+    **Closed contribution-type sets**
+
+    Every `Panel` declares a closed set of **contribution types** at
+    Pack-registration time (one contribution type = one panel property =
+    one slot in the JSON Schema sense). A `Contribution` belongs to
+    exactly one `(panel, contributionType)` pair, with the contribution
+    type drawn from the panel's closed set. Adding a contribution type
+    at Run time is rejected (invariant I-3 in the GSM Sourcing
+    Blackboard skill).
+
+    ====
+
+    **Conflict resolution and the resolved view**
+
+    Each panel declares a default `ContributionResolver`. KSs may post
+    multiple competing Contributions for the same `(panel,
+    contributionType, identityKey)` triple; the resolver collapses them
+    into a single resolved value visible via
+    `BlackboardView.resolved(panel, identityKey)`. Resolvers:
+    `highestConfidence`, `firstWriter`, `failOnConflict`,
+    `userMediated`, `collectAll`, `compose` (schema-driven per-key
+    merge of value objects — used by Statement so multiple
+    StatementShapingKSs can populate disjoint archetype fields).
+    `ConfidenceSynthesisKS`, `ReconciliationKS`, and ensemble KSs MUST
+    use `BlackboardView.contributionsOf(panel, identityKey)` instead —
+    `resolved` would already have collapsed the diversity those KSs
+    need to reason over.
+
+    ====
+
+    **Engine run state distinct from the Blackboard**
+
+    The Run input (operator intent, scope, focus, profile, resolver
+    overrides, external tool bindings, run invariants) does NOT live on
+    the Blackboard as a confidence-1.0 hypothesis (a deliberate
+    departure from Hearsay-II). It lives in `SourcingRunContext` — a
+    **frozen run-scoped engine value, distinct from the Blackboard** —
+    accessed via `controlContext.runContext()`. Rationale: the Run
+    input is structured Pack-typed metadata, not raw signal that needs
+    incremental hypothesis-driven interpretation.
+
+    ====
+
+    **Panel DAG (engine-validated at Pack registration)**
+
+    ```
+    SourceInventory  ->  SourceUnit
+    SourceUnit       ->  SourceInterface
+    SourceUnit       ->  SourceRelation
+    {SourceInterface, SourceUnit, SourceRelation} -> Definition  <<bridge>>
+    Definition       ->  Archetype
+    Archetype        ->  Statement
+    Statement        ->  Granularity
+    Statement        ->  Evidence
+    Evidence         ->  Confidence
+    ```
+
+    A KS's `readsPanels` MUST be a subset of the transitive ancestors
+    of its `writesPanel` in this DAG. Cross-DAG reads are rejected at
+    Pack registration. Cycles are rejected. Note that the four source
+    analysis panels appear as concrete subclasses of
+    `SourceAnalysisPanel` and live in the Pack diagram; here only the
+    abstract class is shown as a placeholder.
+  end note
+
+  ' ============================================================
+  ' PANEL — abstract root (DIP boundary for the Controller)
+  ' ============================================================
+
+  abstract class Panel <<engine>> {
+    +getName(): String
+    +getOwner(): PanelOwner
+    +getContributionTypes(): String[]
+    +getDependsOnPanels(): String[]
+    +getValueSchemaRef(): URI
+    +getDefaultResolver(): ContributionResolver
+    +accept(Contribution c): ValidationResult
   }
 
-  package "Target Panels Group (engine-owned, GSM spine)" as TGT {
-    class Definition <<panel>> {
-      slots:
-      Claim   (IdentificationKS)
-      Merge   (ReconciliationKS)
-      ----
-      keyed by identityKey
-      subjectKind in
-      {Structure, Mechanism, Effector,
-       Receptor, Interaction, Archetype,
-       Directive, Norm}
-    }
-    class Archetype <<panel>> {
-      slots:
-      Application
-      ----
-      one ArchetypeRef per contribution
-      panel-effective value =
-      union over Applications
-    }
-    class Statement <<panel>> {
-      slots:
-      Draft
-      ----
-      validated against the
-      resolved archetype JSON Schema
-    }
-    class Granularity <<panel>> {
-      slots:
-      Verdict
-      ----
-      verdict in {keep, drop,
-                  splitInto, mergeWith}
-    }
-    class Evidence <<panel>> {
-      slots:
-      Signal
-      ----
-      additive; weight in [-1,1]
-      resolver = collectAll
-    }
-    class Confidence <<panel>> {
-      slots:
-      Score
-      ----
-      targetPanel in
-      {Definition, Archetype,
-       Statement, Granularity}
-    }
+  note bottom of Panel
+    **Panel** — Closed-typed contribution-bearing region of the
+    Blackboard.
+
+    **Concept Semantics**:
+
+    - A Panel is a typed region of the Blackboard on which Knowledge
+      Sources post Contributions. It is the engine's unit of dependency
+      inversion: the Sourcer Controller depends on this abstraction,
+      not on any concrete subclass.
+    - A Panel declares a CLOSED set of contribution types (formerly
+      "slots") at Pack registration time. One contribution type is one
+      panel property; one Contribution belongs to exactly one
+      `(panel, contributionType)` pair.
+    - A Panel is owned either by the **engine** (target definition
+      panels — the GSM spine) or by a **Pack** (source analysis panels
+      — domain-specific source observations). Owner is sealed at
+      registration.
+    - The Panel knows its place in the engine-validated panel DAG via
+      `getDependsOnPanels()`. The DAG is validated for acyclicity and
+      cross-DAG-read containment at Pack registration.
+
+    **Method Semantics**:
+
+    - `getName()`: panel name. SHOULD be Pack-namespaced for source
+      analysis panels (e.g. `itip:SourceUnit`); engine-owned target
+      panels use unqualified GSM-spine names (Definition, Archetype,
+      Statement, Granularity, Evidence, Confidence).
+    - `getOwner()`: ENGINE or PACK. Sealed at Pack registration.
+    - `getContributionTypes()`: the closed set of contribution-type
+      identifiers this panel accepts. Engine-defined contribution types
+      on engine-owned panels are sealed. Packs MAY add Pack-namespaced
+      additive contribution types via `pack-manifest.extendsPanels`.
+    - `getDependsOnPanels()`: panel-DAG edges. Engine-owned panel names
+      are allowed for upward bridges from source to target.
+    - `getValueSchemaRef()`: versioned `gsmarc://` URI of the panel's
+      value JSON Schema. Resolution: lookup as a resource bundled in
+      the Pack JAR at `/META-INF/gsmarc/<URI-tail>`. The URI is
+      informational + cache key — no network fetch.
+    - `getDefaultResolver()`: panel-default `ContributionResolver`.
+      RunConfig may override per panel.
+    - `accept(Contribution)`: engine-side acceptance check —
+      contribution type membership, value-schema validation,
+      determinism + cacheKey rule (I-4), kind + checkpointId rule (I-11).
+
+    **Validation Rules**:
+
+    - `getName()` MUST be unique within a Run. The engine collision-
+      rejects two Pack manifests declaring the same panel name with
+      non-identical `getValueSchemaRef()` or `getContributionTypes()`.
+    - `getDependsOnPanels()` MUST NOT introduce a cycle in the DAG.
+    - A Contribution accepted by a Panel MUST carry a `slot` that is a
+      member of `getContributionTypes()`.
+    - A Contribution with `determinism = NON_DETERMINISTIC` MUST carry
+      `cacheKey` (I-4).
+    - A Contribution with `kind = USER_OVERRIDE` MUST carry
+      `checkpointId` (I-11).
+
+    **Derivation Rules**:
+
+    - `getName()` -> `pack-manifest.panels[].name` for PACK panels;
+      engine-defined constant for ENGINE panels.
+    - `getOwner()` -> ENGINE for built-in engine spine panels; PACK
+      otherwise.
+    - `getContributionTypes()` -> union of declared `slots` and any
+      additive `extendsPanels` contribution types.
+    - `getValueSchemaRef()` -> declared `valueSchemaRef`.
+    - `getDefaultResolver()` -> per-panel constant declared in the
+      engine ontology (target panels) or in the Pack manifest (source
+      panels).
+  end note
+
+  enum PanelOwner {
+    ENGINE
+    PACK
   }
 
-  ' Panel DAG (Pack-owned source side + bridge + engine-owned target side)
-  SourceInventory --> SourceUnit
-  SourceUnit --> SourceInterface
-  SourceUnit --> SourceRelation
-  SourceInterface --> Definition : <<bridge>>
-  SourceUnit --> Definition : <<bridge>>
-  SourceRelation --> Definition : <<bridge>>
+  enum ContributionResolver {
+    highestConfidence
+    firstWriter
+    failOnConflict
+    userMediated
+    collectAll
+    compose
+  }
+
+  ' ============================================================
+  ' SOURCE ANALYSIS PANELS — placeholder group with DIP class only
+  ' ============================================================
+
+  package "Source analysis panels (Pack-owned; DIP placeholder)" as SRC {
+
+    abstract class SourceAnalysisPanel <<engine>> {
+      +getSourceArtefactKind(): String
+      +bridgesToTargetPanel(): String
+    }
+
+    note bottom of SourceAnalysisPanel
+      **SourceAnalysisPanel** — Abstract Pack-side panel base
+      (engine-owned DIP boundary).
+
+      **Concept Semantics**:
+
+      - The abstract base class every Pack-owned source-side panel MUST
+        extend. Defines the Sourcer Controller's only dependency on
+        Pack code — concrete subclasses are loaded as Pack JARs in
+        sandboxed classloaders during the Initializer's Plug-in Loader
+        substep, then declared on the Blackboard during the Blackboard
+        Builder substep.
+      - A source analysis panel captures the **source-side analysis of
+        the artefact under sourcing** — what the Pack observes in the
+        source material before any GSM-spine identity is asserted.
+        Examples in the Repository Sourcing Pack: file inventory, code
+        units, code-level relations, exposed interfaces.
+      - Its DAG outputs ALWAYS bridge upward into a target definition
+        panel (typically `Definition` via `<<bridge>>` edges). Source
+        panels never write to the engine spine directly — only KSs do
+        (an `IdentificationKS` reads source panels and posts to
+        `Definition.Claim`).
+      - Concrete subclasses live in the Pack repository, NOT here. See
+        `itip/def/repository-sourcing-pack/repository-sourcing-pack.puml`
+        for the four concrete classes currently defined.
+
+      **Method Semantics**:
+
+      - `getSourceArtefactKind()`: short identifier of the source-side
+        artefact family this panel observes (e.g. `inventory`, `unit`,
+        `relation`, `interface`). Free-form; informational only.
+      - `bridgesToTargetPanel()`: the name of the target definition
+        panel this source panel bridges to via `<<bridge>>` DAG edges.
+        Almost always `"Definition"`; reserved for future
+        configurations where Packs bridge to a different entry point of
+        the target spine.
+
+      **Validation Rules**:
+
+      - `getOwner()` MUST return `PACK` for any concrete
+        `SourceAnalysisPanel`.
+      - `bridgesToTargetPanel()` MUST resolve to a registered engine-
+        owned `TargetDefinitionPanel` name.
+      - The panel's `getName()` SHOULD be Pack-namespaced.
+
+      **Derivation Rules**:
+
+      - The Sourcer Controller schedules Knowledge Sources by trigger
+        predicates over `Panel` (the abstract). It never type-tests for
+        a concrete `SourceAnalysisPanel` subclass.
+      - Concrete subclasses are introduced by the Pack's
+        `pack-manifest.panels[]` declarations and instantiated by the
+        Blackboard Builder.
+    end note
+
+    note as SrcPlaceholder
+      **Concrete subclasses live in the Pack diagrams.**
+      For the Repository Sourcing Pack, see:
+      `itip/def/repository-sourcing-pack/repository-sourcing-pack.puml`
+      (currently: `SourceInventory`, `SourceUnit`,
+      `SourceRelation`, `SourceInterface`).
+    end note
+  }
+
+  ' ============================================================
+  ' TARGET DEFINITION PANELS — engine-owned GSM spine
+  ' ============================================================
+
+  package "Target definition panels (engine-owned; GSM spine)" as TGT {
+
+    abstract class TargetDefinitionPanel <<engine>> {
+      +getTargetIdentityKeyOf(Contribution c): String
+      +getSubjectKindRange(): DefinitionSubjectKind[]
+    }
+
+    note bottom of TargetDefinitionPanel
+      **TargetDefinitionPanel** — Abstract engine-side panel base
+      (GSM spine).
+
+      **Concept Semantics**:
+
+      - The abstract base class for the six engine-owned panels that
+        materialise the GSM spine on the Blackboard: Definition,
+        Archetype, Statement, Granularity, Evidence, Confidence.
+      - All target definition panels are KEYED BY `identityKey` — the
+        identifier of the GSM subject under definition. The
+        Definition panel MINTS the identity key (`Claim`) and may
+        merge prior keys (`Merge`); all other target panels CARRY
+        `targetIdentityKey` on every Contribution to anchor it to a
+        Definition.
+      - Tenants MAY add Pack-namespaced additive contribution types
+        via `pack-manifest.extendsPanels` (e.g. `itip:Refined` on
+        `Statement`). Engine-defined contribution types are sealed.
+      - The Pipeline (`ValidatedAscriptionDraft`,
+        `RegisteredAscription`) consumes the converged target tuple per
+        identity. Pipeline records are NOT panels (I-8).
+
+      **Method Semantics**:
+
+      - `getTargetIdentityKeyOf(Contribution)`: extracts the
+        identity-key the Contribution targets. For `Definition` this is
+        `value.identityKey`; for the other five panels it is
+        `value.targetIdentityKey`.
+      - `getSubjectKindRange()`: the set of GSM subject kinds this
+        panel may carry data for. For `Definition` this is the full
+        eight-primitive enum; downstream panels narrow only when their
+        per-subject semantics require it (most accept all eight).
+
+      **Validation Rules**:
+
+      - `getOwner()` MUST return `ENGINE`.
+      - For non-Definition panels, every accepted Contribution MUST
+        carry a non-null `targetIdentityKey` resolving to a Definition
+        present on the Blackboard.
+      - For `Definition.Merge` Contributions, every entry of
+        `supersedesIdentityKeys` MUST resolve to a prior
+        `Definition.Claim` Contribution on the Blackboard.
+
+      **Derivation Rules**:
+
+      - Engine-owned; instantiated by the Blackboard Builder substep
+        from a fixed engine ontology (the six concrete subclasses
+        below).
+    end note
+
+    enum DefinitionSubjectKind {
+      STRUCTURE
+      MECHANISM
+      EFFECTOR
+      RECEPTOR
+      INTERACTION
+      ARCHETYPE
+      DIRECTIVE
+      NORM
+    }
+
+    class Definition <<engine,target>> {
+      +getId(): String
+      +getName(): String
+      +getOwner(): PanelOwner
+      +getContributionTypes(): String[]
+      +getDefaultResolver(): ContributionResolver
+      +getSubjectKind(Contribution c): DefinitionSubjectKind
+      +getIdentityKey(Contribution c): String
+    }
+
+    note bottom of Definition
+      **Definition** — Identity-binding panel of the GSM spine.
+
+      **Concept Semantics**:
+
+      - The Definition panel decides WHICH source items collectively
+        define ONE GSM subject (Structure, Mechanism, Effector,
+        Receptor, Interaction, Archetype, Directive, Norm). It is the
+        join key for every other target panel.
+      - Two contribution types (closed):
+        - `Claim` — an `IdentificationKS` asserts an identity for a
+          subject based on source-panel evidence.
+        - `Merge` — a `ReconciliationKS` asserts that two prior
+          identities describe the same subject and supersedes them.
+      - Default resolver: `highestConfidence`. Conflicts with two
+        equally-confident `Claim`s on the same surface key are
+        escalated to a Checkpoint (`failOnConflict` / `userMediated`).
+
+      **Method Semantics**:
+
+      - `getSubjectKind(Contribution)`: returns the GSM primitive kind
+        the Definition asserts (sealed eight-value enum).
+      - `getIdentityKey(Contribution)`: stable identifier of the
+        subject; used as the join key by all downstream target panels.
+
+      **Validation Rules**:
+
+      - `Claim` Contributions MUST carry `subjectKind`, `identityKey`,
+        and `supportingSourceIds` (Contribution ids from source
+        analysis panels).
+      - `Merge` Contributions MUST carry `supersedesIdentityKeys`
+        (non-empty) and a `targetIdentityKey` for the surviving
+        identity.
+
+      **Merge precedence rule (Definition.Merge vs Granularity.mergeWith)**:
+
+      - `Definition.Merge` is identity-time merging (pre-Statement),
+        based on source-side signals only.
+      - `Granularity.mergeWith` is post-statement consolidation,
+        informed by the populated Statement.
+      - When both apply to the same identity, `Granularity.mergeWith`
+        wins (more informed). The Override Cascader supersedes the
+        earlier `Definition.Merge` and re-fires downstream triggers
+        per I-11 cascade scope.
+
+      **Derivation Rules**:
+
+      - `getOwner()` -> `ENGINE` (constant).
+      - `getName()` -> `"Definition"` (constant).
+      - `getContributionTypes()` -> `{"Claim", "Merge"}` plus any
+        Pack-namespaced extensions.
+      - `getDefaultResolver()` -> `highestConfidence`.
+    end note
+
+    class Archetype <<engine,target>> {
+      +getId(): String
+      +getName(): String
+      +getOwner(): PanelOwner
+      +getContributionTypes(): String[]
+      +getDefaultResolver(): ContributionResolver
+      +getArchetypeRef(Contribution c): URI
+    }
+
+    note bottom of Archetype
+      **Archetype** — Archetype-application panel of the GSM spine.
+
+      **Concept Semantics**:
+
+      - Captures which GSM Archetype(s) apply to a given Definition.
+        One contribution type (closed):
+        - `Application` — an `ArchetypeKS` posts one
+          archetype reference per Contribution. Multiple
+          Contributions per identity are union-resolved.
+      - Default resolver: `collectAll` (union over Applications). The
+        Pipeline reads the union as the resolved archetype set for the
+        Definition.
+
+      **Method Semantics**:
+
+      - `getArchetypeRef(Contribution)`: versioned `gsmarc://` URI of
+        the GSM Archetype Definition.
+
+      **Validation Rules**:
+
+      - Every `Application` Contribution MUST carry a non-null
+        `targetIdentityKey` and a non-null `archetypeRef` resolving to
+        a registered Archetype.
+      - The asserted Archetype's structural-base (allOf chain) MUST
+        be compatible with the `Definition.subjectKind` (e.g. a
+        `Mechanism`-rooted Archetype cannot be applied to a Definition
+        whose `subjectKind` is `STRUCTURE`).
+
+      **Derivation Rules**:
+
+      - `getOwner()` -> `ENGINE`.
+      - `getName()` -> `"Archetype"`.
+      - `getContributionTypes()` -> `{"Application"}` plus extensions.
+      - `getDefaultResolver()` -> `collectAll`.
+    end note
+
+    class Statement <<engine,target>> {
+      +getId(): String
+      +getName(): String
+      +getOwner(): PanelOwner
+      +getContributionTypes(): String[]
+      +getDefaultResolver(): ContributionResolver
+      +getStatement(Contribution c): JsonObject
+      +getCompleteness(Contribution c): Completeness
+      +getShapingMethod(Contribution c): String
+    }
+
+    note bottom of Statement
+      **Statement** — Statement-shaping panel of the GSM spine.
+
+      **Concept Semantics**:
+
+      - Holds populated GSM statement payloads conforming to the
+        resolved Archetype's JSON Schema. One contribution type
+        (closed):
+        - `Draft` — a `StatementShapingKS` posts a partial or full
+          statement payload.
+      - Default resolver: `compose`. Multiple StatementShapingKSs may
+        post Contributions populating disjoint archetype fields; the
+        engine's schema-driven per-key merge assembles the union into
+        the resolved Statement. This is the panel-level realisation of
+        cooperative shaping.
+
+      **Method Semantics**:
+
+      - `getStatement(Contribution)`: the (possibly partial)
+        archetype-typed JSON statement.
+      - `getCompleteness(Contribution)`: `partial` or `full`. The
+        Pipeline's Validation stage rejects compositions that remain
+        `partial` after resolution.
+      - `getShapingMethod(Contribution)`: free-form identifier of the
+        shaping technique used (`structural-extraction`,
+        `llm-completion`, ...). Informational; used by Evidence and
+        Confidence KSs.
+
+      **Validation Rules**:
+
+      - Every `Draft` Contribution MUST carry a non-null
+        `targetIdentityKey` resolving to an Archetype-resolved
+        Definition.
+      - `getStatement()` MUST validate against the resolved Archetype
+        schema for the targeted Definition (the engine performs an
+        incremental schema check at post time).
+      - LLM-driven Contributions MUST carry `determinism =
+        NON_DETERMINISTIC` and a `cacheKey` (I-4).
+
+      **Derivation Rules**:
+
+      - `getOwner()` -> `ENGINE`.
+      - `getName()` -> `"Statement"`.
+      - `getContributionTypes()` -> `{"Draft"}` plus extensions.
+      - `getDefaultResolver()` -> `compose`.
+    end note
+
+    class Granularity <<engine,target>> {
+      +getId(): String
+      +getName(): String
+      +getOwner(): PanelOwner
+      +getContributionTypes(): String[]
+      +getDefaultResolver(): ContributionResolver
+      +getVerdict(Contribution c): GranularityVerdict
+      +getMergeWithIdentityKey(Contribution c): String
+      +getSplitIntoIdentityKeys(Contribution c): String[]
+    }
+
+    enum GranularityVerdict {
+      keep
+      drop
+      splitInto
+      mergeWith
+    }
+
+    note bottom of Granularity
+      **Granularity** — Post-statement consolidation panel of the GSM
+      spine.
+
+      **Concept Semantics**:
+
+      - Holds per-Definition consolidation verdicts AFTER Statement
+        shaping. One contribution type (closed):
+        - `Verdict` — a `GranularityKS` posts one of four verdicts:
+          `keep`, `drop`, `splitInto`, `mergeWith`.
+      - Distinct from `Definition.Merge`: Granularity runs AFTER
+        Statement shaping, so its `mergeWith` verdict is informed by
+        the populated GSM statement and TAKES PRECEDENCE over any
+        earlier identity-time `Definition.Merge` for the same identity
+        (Override Cascader supersedes the earlier `Merge`).
+      - Default resolver: `highestConfidence`.
+
+      **Method Semantics**:
+
+      - `getVerdict(Contribution)`: one of the four enum values.
+      - `getMergeWithIdentityKey(Contribution)`: required when
+        `verdict = mergeWith` — the surviving identity.
+      - `getSplitIntoIdentityKeys(Contribution)`: required when
+        `verdict = splitInto` — the new identities introduced.
+
+      **Validation Rules**:
+
+      - Every `Verdict` Contribution MUST carry a non-null
+        `targetIdentityKey`.
+      - `mergeWith` Contributions MUST carry a non-null
+        `mergeWithIdentityKey` resolving to a Definition on the
+        Blackboard.
+      - `splitInto` Contributions MUST carry a non-empty
+        `splitIntoIdentityKeys[]`. Each new identity yields a fresh
+        Definition + downstream-target re-fire.
+
+      **Derivation Rules**:
+
+      - `getOwner()` -> `ENGINE`.
+      - `getName()` -> `"Granularity"`.
+      - `getContributionTypes()` -> `{"Verdict"}` plus extensions.
+      - `getDefaultResolver()` -> `highestConfidence`.
+    end note
+
+    class Evidence <<engine,target>> {
+      +getId(): String
+      +getName(): String
+      +getOwner(): PanelOwner
+      +getContributionTypes(): String[]
+      +getDefaultResolver(): ContributionResolver
+      +getWeight(Contribution c): double
+      +getEvidenceKind(Contribution c): String
+    }
+
+    note bottom of Evidence
+      **Evidence** — Confidence-feeding panel of the GSM spine.
+
+      **Concept Semantics**:
+
+      - Aggregates positive or negative signals about a Definition's
+        Statement and surrounding context. One contribution type
+        (closed):
+        - `Signal` — an `EvidenceCollectionKS` posts one weighted
+          signal per Contribution. Additive — every Signal counts.
+      - Default resolver: `collectAll`. The resolved view is the full
+        list of Signals; `ConfidenceSynthesisKS` reads the list (via
+        `contributionsOf`, NOT `resolved`) to compute a Confidence
+        Score.
+
+      **Method Semantics**:
+
+      - `getWeight(Contribution)`: signal weight in `[-1, 1]`. Negative
+        weights count against the Statement.
+      - `getEvidenceKind(Contribution)`: free-form classifier
+        (`test-pass`, `test-fail`, `interface-coherence`,
+        `relation-density`, ...). Informational.
+
+      **Validation Rules**:
+
+      - Every `Signal` Contribution MUST carry a non-null
+        `targetIdentityKey` and a `weight` in `[-1, 1]`.
+
+      **Derivation Rules**:
+
+      - `getOwner()` -> `ENGINE`.
+      - `getName()` -> `"Evidence"`.
+      - `getContributionTypes()` -> `{"Signal"}` plus extensions.
+      - `getDefaultResolver()` -> `collectAll`.
+    end note
+
+    class Confidence <<engine,target>> {
+      +getId(): String
+      +getName(): String
+      +getOwner(): PanelOwner
+      +getContributionTypes(): String[]
+      +getDefaultResolver(): ContributionResolver
+      +getScore(Contribution c): double
+      +getTargetPanel(Contribution c): String
+    }
+
+    note bottom of Confidence
+      **Confidence** — Confidence-synthesis panel of the GSM spine.
+
+      **Concept Semantics**:
+
+      - Holds the synthesised confidence score per Definition (and
+        optionally per downstream target panel: Definition, Archetype,
+        Statement, Granularity). One contribution type (closed):
+        - `Score` — a `ConfidenceSynthesisKS` posts one Score
+          Contribution per identity (and optional `targetPanel`).
+      - Default resolver: `highestConfidence`. The Pipeline's
+        Validation stage MAY require a minimum Score per identity
+        before producing a `ValidatedAscriptionDraft`.
+      - The trigger DSL exposes the predicate
+        `confidenceBelow(identity, threshold)` for revision predicates
+        — a low Score can re-fire upstream KSs even when their nominal
+        upstream contribution is already resolved.
+
+      **Method Semantics**:
+
+      - `getScore(Contribution)`: synthesised score in `[0, 1]`.
+      - `getTargetPanel(Contribution)`: name of the target panel the
+        Score qualifies. One of `{Definition, Archetype, Statement,
+        Granularity}`.
+
+      **Validation Rules**:
+
+      - Every `Score` Contribution MUST carry a non-null
+        `targetIdentityKey` and a `score` in `[0, 1]`.
+      - `targetPanel` MUST resolve to a registered engine-owned
+        `TargetDefinitionPanel` other than `Evidence` and other than
+        `Confidence` itself.
+
+      **Derivation Rules**:
+
+      - `getOwner()` -> `ENGINE`.
+      - `getName()` -> `"Confidence"`.
+      - `getContributionTypes()` -> `{"Score"}` plus extensions.
+      - `getDefaultResolver()` -> `highestConfidence`.
+    end note
+  }
+
+  ' ============================================================
+  ' CONTRIBUTION (anchor type)
+  ' ============================================================
+
+  class Contribution <<engine>> {
+    +getId(): String
+    +getPanel(): String
+    +getSlot(): String
+    +getValue(): JsonObject
+    +getTargetIdentityKey(): String
+    +getContributorKsId(): URI
+    +getKind(): ContributionKind
+    +getCheckpointId(): String
+    +getDeterminism(): Determinism
+    +getCacheKey(): String
+    +getDerivedFrom(): String[]
+    +getSupersedes(): String[]
+    +getCreatedAt(): Instant
+  }
+
+  enum ContributionKind {
+    KS_DERIVED
+    INSTRUCTIONS_DERIVED
+    USER_OVERRIDE
+  }
+
+  enum Determinism {
+    DETERMINISTIC
+    NON_DETERMINISTIC
+  }
+
+  note bottom of Contribution
+    **Contribution** — Atomic post on the Blackboard.
+
+    **Concept Semantics**:
+
+    - The unit of work on the Blackboard. A Contribution is posted by
+      a Knowledge Source (or by the Initializer for
+      `INSTRUCTIONS_DERIVED`, or by a Reviewer at a Checkpoint for
+      `USER_OVERRIDE`).
+    - Belongs to exactly ONE `(panel, slot)` pair, where `slot` is a
+      member of the panel's `getContributionTypes()`.
+    - The engine attaches `id`, `contributorKsId`, `kind`,
+      `derivedFrom`, `createdAt`, `supersedes`. KSs cannot fabricate
+      them.
+    - User overrides cascade via the Override Cascader: cascade scope
+      is the closure over `derivedFrom` UNION all downstream panels for
+      the same `targetIdentityKey` (I-11).
+
+    **Method Semantics**:
+
+    - `getKind()`: provenance class — `KS_DERIVED` (default),
+      `INSTRUCTIONS_DERIVED` (Initializer-posted before Control
+      starts), `USER_OVERRIDE` (Reviewer-posted at a Checkpoint).
+    - `getCheckpointId()`: required when `kind = USER_OVERRIDE`;
+      identifies the suspended Checkpoint.
+    - `getDeterminism()`: `DETERMINISTIC` (structural extraction) or
+      `NON_DETERMINISTIC` (LLM-driven).
+    - `getCacheKey()`: required when `determinism = NON_DETERMINISTIC`
+      (I-4). Stable hash of `(KS id, KS version, all read inputs)`.
+    - `getDerivedFrom()`: ids of Contributions read by the KS to
+      produce this one. Used by the Override Cascader.
+    - `getSupersedes()`: ids this Contribution supersedes (engine-set).
+
+    **Validation Rules**:
+
+    - `(panel, slot)` MUST be a registered pair: `slot` is a member of
+      `panel.getContributionTypes()`.
+    - `targetIdentityKey` is required for non-source panels (target
+      definition panels carry it; source analysis panels MAY omit it).
+    - `determinism = NON_DETERMINISTIC` -> `cacheKey` MUST be present
+      (I-4).
+    - `kind = USER_OVERRIDE` -> `checkpointId` MUST be present (I-11).
+
+    **Derivation Rules**:
+
+    - All engine-attached fields are derived at post time from the
+      executing KS's identity, the Contribution's read set, and the
+      current Run state.
+  end note
+
+  ' ============================================================
+  ' SOURCING RUN CONTEXT (engine run state)
+  ' ============================================================
+
+  package "Engine run state\n(distinct from the Blackboard)" as ERS {
+
+    class SourcingRunContext <<engine,immutable>> {
+      +getRunId(): String
+      +getProfile(): JsonObject
+      +getInstructionsPayload(): JsonObject
+      +getScope(): Scope
+      +getFocus(): Focus
+      +getRunInvariants(): RunInvariants
+      +getResolverOverrides(): Map<String, ContributionResolver>
+      +getExternalToolBindings(): ExternalToolBinding[]
+    }
+
+    note bottom of SourcingRunContext
+      **SourcingRunContext** — Frozen run-scoped engine value (NOT a
+      panel).
+
+      **Concept Semantics**:
+
+      - Built by the `Initializer` in five substeps: Plug-in Loader ->
+        Instructions Provider -> Scope Builder -> Focus Builder ->
+        freeze `SourcingRunContext` -> Blackboard Builder. The freeze
+        happens BEFORE the Blackboard Builder stands up the panels, so
+        the Run state is fully determined before any KS can run.
+      - Read by all KSs as a read-only value via
+        `controlContext.runContext()`. The deliberate departure from
+        Hearsay-II: the Run input lives HERE, not as a Blackboard
+        hypothesis (I-1).
+
+      **Method Semantics**:
+
+      - `getProfile()`: operator-supplied profile (free-form Pack-typed).
+      - `getInstructionsPayload()`: forwarded verbatim from RunConfig
+        to the Pack's Instructions Provider.
+      - `getScope()`: derived `{ inclusion[], exclusion[],
+        axisDecision }`.
+      - `getFocus()`: derived `{ priorityBands[] }`.
+      - `getRunInvariants()`: `{ maxIterations, quiescenceThreshold,
+        determinismMode, completionPredicate? }`.
+      - `getResolverOverrides()`: per-panel resolver overrides.
+      - `getExternalToolBindings()`: operator-narrowed bindings of
+        the Pack's `requestedExternalTools[]` to host paths.
+
+      **Validation Rules**:
+
+      - Frozen after Initialization. Any mutation attempt MUST raise.
+      - `runInvariants.completionPredicate`, when set, MUST parse as a
+        valid trigger-DSL expression.
+
+      **Derivation Rules**:
+
+      - Built once per Run by the Initializer's substeps.
+    end note
+  }
+
+  ' ============================================================
+  ' RELATIONSHIPS
+  ' ============================================================
+
+  ' DIP hierarchy
+  SourceAnalysisPanel --|> Panel
+  TargetDefinitionPanel --|> Panel
+  Definition --|> TargetDefinitionPanel
+  Archetype --|> TargetDefinitionPanel
+  Statement --|> TargetDefinitionPanel
+  Granularity --|> TargetDefinitionPanel
+  Evidence --|> TargetDefinitionPanel
+  Confidence --|> TargetDefinitionPanel
+
+  ' Panel <-> Contribution
+  Panel ..> Contribution : <<accepts>>
+
+  ' Panel DAG (target side; source-side bridges originate from concrete
+  ' SourceAnalysisPanel subclasses defined in the Pack diagram)
   Definition --> Archetype
   Archetype --> Statement
   Statement --> Granularity
   Statement --> Evidence
   Evidence --> Confidence
 
-  package "Engine run state\n(distinct from the Blackboard)" as ERS <<Frame>> {
-    class SourcingRunContext <<immutable>> {
-      runId
-      profile
-      instructionsPayload
-      scope { inclusion, exclusion, axisDecision }
-      focus { priorityBands }
-      runInvariants { maxIterations,
-                      quiescenceThreshold,
-                      determinismMode }
-      resolverOverrides
-      externalToolBindings
-      ----
-      built by Initializer in
-      3 substeps; frozen for the Run
-      BEFORE the Blackboard Builder
-      substep stands up the panels;
-      read by all KSs via
-      controlContext.runContext()
-    }
-  }
-
-  note bottom of SRC
-    Pack-owned topology. Slot sets are CLOSED at Pack
-    registration (one slot = one contribution-type =
-    one panel property). Panel value schema is owned
-    by the Pack.
-  end note
-
-  note bottom of TGT
-    Engine-owned topology (GSM spine). Closed slot
-    sets, frozen value schemas. The Pipeline consumes
-    the converged target tuple; Pipeline records
-    (ValidatedAscriptionDraft, RegisteredAscription)
-    are NOT panels.
-  end note
+  ' Engine run state -> Blackboard (built BEFORE panels)
+  SourcingRunContext ..> Panel : <<frozen before\nBlackboard Builder>>
 }
 
 @enduml
