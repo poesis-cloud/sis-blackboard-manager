@@ -107,7 +107,7 @@
         },
         "completionPredicate": {
           "type": "string",
-          "description": "Optional 'satisfactory solution' stop criterion expressed in the trigger DSL (read-only over Blackboard state + runContext). When it evaluates true, Control short-circuits the Iteration loop even before quiescence. Example: `count(panel == Definition && !resolved(Confidence, identity)) == 0 && count(panel == Confidence && score < 0.5) == 0`."
+          "description": "Optional 'satisfactory solution' stop criterion. Fully-qualified Java class name (loaded from a Pack JAR) implementing the engine's CompletionPredicate interface: `boolean test(BlackboardView view, SourcingRunContext ctx)`. When it returns true, Control short-circuits the Iteration loop even before quiescence. Implementations use the same BlackboardView Java accessors as KS triggerPredicates. There is NO string DSL."
         }
       },
       "additionalProperties": false

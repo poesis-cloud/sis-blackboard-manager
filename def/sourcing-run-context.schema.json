@@ -105,7 +105,7 @@
         },
         "completionPredicate": {
           "type": "string",
-          "description": "Optional 'satisfactory solution' stop criterion in the trigger DSL. Frozen from RunConfig."
+          "description": "Optional 'satisfactory solution' stop criterion. Fully-qualified Java class name implementing the engine's CompletionPredicate interface. Frozen from RunConfig."
         }
       },
       "additionalProperties": false

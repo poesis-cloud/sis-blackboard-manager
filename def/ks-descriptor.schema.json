@@ -74,7 +74,7 @@
     },
     "triggerPredicate": {
       "type": "string",
-      "description": "Tiny declarative DSL over Blackboard state + runContext. Operators: ==, !=, <, >, <=, >=, &&, ||, !, .size. Per-identity predicates: panel == <Panel>, slot == <Slot>, resolved(<Panel>, identity), contributedBy(self, identity), evidence(identity).size > N, runContext.scope.includes(identity). Revision predicates (enable opportunistic / top-down re-firing even when the nominal upstream slot is already resolved): confidenceBelow(identity, threshold), statementAmbiguous(identity), validationFailed(identity). Aggregate (cross-identity) predicates: count(<per-identity-predicate>) <op> N. Examples: `count(panel == Definition && !resolved(Archetype, identity)) > 5`, `panel == Confidence && confidenceBelow(identity, 0.5)`."
+      "description": "Fully-qualified Java class name (loaded from the Pack JAR) implementing the engine's KsTriggerPredicate interface: `boolean test(BlackboardView view, SourcingRunContext ctx)`. Evaluated by the Sourcer Controller per scheduling tick. BlackboardView exposes typed Java accessors (resolved(panel, identity), contributionsOf(panel, identity), evidenceOf(identity), confidenceBelow(identity, threshold), statementAmbiguous(identity), validationFailed(identity), count(...), runContext().scope().includes(identity), ...) so triggers are expressed in plain Java. There is NO string DSL."
     },
     "appliesToInterpretationKinds": {
       "type": "array",
