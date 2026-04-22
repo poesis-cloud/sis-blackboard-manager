@@ -2,16 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/SourceInventory/v1",
   "title": "SourceInventoryValue",
-  "description": "Reference aggregate value template for the SourceInventory panel: structural catalogue of source artefacts (no semantics yet). Polymorphic by `contributionType`. Pack-owned panel; engine declares the panel name only as part of the source-side topology contract. Operational form (used by the engine at registration): the Pack declares per-contribution-type value schemas in `pack-manifest.panels[].contributionTypes`; this file documents the shared envelope.",
+  "description": "Reference aggregate value template for the SourceInventory panel: structural catalogue of source artefacts (no semantics yet). Polymorphic by `slot`. Pack-owned panel; engine declares the panel name only as part of the source-side topology contract. Operational form (used by the engine at registration): the Pack declares per-slot value schemas in `pack-manifest.panels[].slots`; this file documents the shared envelope.",
   "type": "object",
   "required": [
-    "contributionType",
+    "slot",
     "payload"
   ],
   "properties": {
-    "contributionType": {
+    "slot": {
       "type": "string",
-      "description": "Closed contribution-type name. Pack registers the closed map at boot. Examples used by the Repository Sourcing Pack: FileTreeNode, GitCommit, ModuleSpec, LanguageClassification, FileMetrics, SbomComponent, ConfigEntry."
+      "description": "Closed slot name. Pack registers the closed map at boot. Examples used by the Repository Sourcing Pack: FileTreeNode, GitCommit, ModuleSpec, LanguageClassification, FileMetrics, SbomComponent, ConfigEntry."
     },
     "payload": {
       "type": "object",

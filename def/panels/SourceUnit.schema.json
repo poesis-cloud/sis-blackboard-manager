@@ -2,15 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/SourceUnit/v1",
   "title": "SourceUnitValue",
-  "description": "Reference aggregate value template for the SourceUnit panel: symbol-level interpretations inside a single language/format unit. Pack-owned. Examples used by the Repository Sourcing Pack: CodeUnit (carries SCIP SymbolInformation), JpaEntity, ProtoMessage, GraphqlSchema, IacResource. Operational form: the Pack declares per-contribution-type value schemas in `pack-manifest.panels[].contributionTypes`; this file documents the shared envelope.",
+  "description": "Reference aggregate value template for the SourceUnit panel: symbol-level interpretations inside a single language/format unit. Pack-owned. Examples used by the Repository Sourcing Pack: CodeUnit (carries SCIP SymbolInformation), JpaEntity, ProtoMessage, GraphqlSchema, IacResource. Operational form: the Pack declares per-slot value schemas in `pack-manifest.panels[].slots`; this file documents the shared envelope.",
   "type": "object",
   "required": [
-    "contributionType",
+    "slot",
     "payload",
     "sourceIdentityKey"
   ],
   "properties": {
-    "contributionType": {
+    "slot": {
       "type": "string"
     },
     "sourceIdentityKey": {

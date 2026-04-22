@@ -2,15 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/SourceRelation/v1",
   "title": "SourceRelationValue",
-  "description": "Reference aggregate value template for the SourceRelation panel: typed edges between SourceUnit / SourceInterface entries. Pack-owned. Examples used by the Repository Sourcing Pack: SymbolRef, TypeHierarchyEdge, ImplementationEdge, ImportEdge, CallEdge, DataflowEdge, DeploymentEdge. Operational form: the Pack declares per-contribution-type value schemas in `pack-manifest.panels[].contributionTypes`; this file documents the shared envelope.",
+  "description": "Reference aggregate value template for the SourceRelation panel: typed edges between SourceUnit / SourceInterface entries. Pack-owned. Examples used by the Repository Sourcing Pack: SymbolRef, TypeHierarchyEdge, ImplementationEdge, ImportEdge, CallEdge, DataflowEdge, DeploymentEdge. Operational form: the Pack declares per-slot value schemas in `pack-manifest.panels[].slots`; this file documents the shared envelope.",
   "type": "object",
   "required": [
-    "contributionType",
+    "slot",
     "fromKey",
     "toKey"
   ],
   "properties": {
-    "contributionType": {
+    "slot": {
       "type": "string"
     },
     "fromKey": {

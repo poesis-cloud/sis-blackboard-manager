@@ -46,12 +46,14 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     **One Java type for all panels.** A panel has no behaviour; it is
     metadata describing a typed region of the Blackboard. The engine
     therefore models every panel — engine-owned target panel and
-    Pack-owned source panel alike — as one immutable Java record
-    `Panel` with fields `(name, kind, contributionTypes,
-    dependsOnPanels)`, where `contributionTypes` maps each
-    contribution-type name to a `ContributionTypeSpec` carrying the
-    per-type JSON Schema URI and `defaultResolver`. There is no
-    class hierarchy,
+    Pack-owned source panel alike — as one Java record
+    `Panel` with fields `(name, kind, slots, dependsOnPanels)`,
+    where `slots` maps each slot name to a `ContributionSlot`. A
+    `ContributionSlot` is itself a composite child of the Panel: it
+    carries the per-slot JSON Schema URI and `defaultResolver`
+    (registration-time metadata) AND owns the live list of
+    `Contribution`s posted into it during a Run (runtime state).
+    There is no class hierarchy,
     no abstract `SourceAnalysisPanel`, no abstract
     `TargetDefinitionPanel`, no per-panel concrete subclass.
     Differentiation is by the `kind` field, not by Java type.
@@ -85,24 +87,24 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     2. **Target definition panels** (`kind = TARGET_DEFINITION`,
        engine-owned). Carry the GSM spine — Definition, Archetype,
        Statement, Granularity, Evidence, Confidence. They are sealed:
-       tenants MAY add Pack-namespaced additive contribution types
+       tenants MAY add Pack-namespaced additive slots
        via `pack-manifest.extendsPanels[]` but MAY NOT redefine
-       engine-defined contribution types or add new target panels at
+       engine-defined slots or add new target panels at
        runtime.
 
     ====
 
-    **Closed contribution-type sets**
+    **Closed slot sets**
 
-    Every `Panel` declares a closed `contributionTypes` map at
-    Pack-registration time. Each entry binds a contribution-type
+    Every `Panel` declares a closed `slots` map at
+    Pack-registration time. Each entry binds a slot
     name (e.g. `Claim`, `Merge`, `Verdict`) to the JSON Schema URI
     that validates Contributions of that type. A `Contribution`
-    belongs to exactly one `(panel, contributionType)` pair, with
-    the contribution-type name drawn from the panel's closed map.
-    Adding a contribution type at Run time is rejected (invariant
+    belongs to exactly one `(panel, slot)` pair, with
+    the slot name drawn from the panel's closed map.
+    Adding a slot at Run time is rejected (invariant
     I-3 in the GSM Sourcing Blackboard skill). There is NO
-    panel-level value schema; schemas live one-per-contribution-type.
+    panel-level value schema; schemas live one-per-slot.
 
     ====
 
@@ -110,7 +112,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
 
     Each panel declares a default `ContributionResolver`. KSs may post
     multiple competing Contributions for the same `(panel,
-    contributionType, identityKey)` triple; the resolver collapses them
+    slot, identityKey)` triple; the resolver collapses them
     into a single resolved value visible via
     `BlackboardView.resolved(panel, identityKey)`. Resolvers:
     `highestConfidence`, `firstWriter`, `failOnConflict`,
@@ -162,38 +164,48 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
   class Panel <<engine,record>> {
     +name: String
     +kind: PanelKind
-    +contributionTypes: Map<String, ContributionTypeSpec>
+    +slots: Map<String, ContributionSlot>
     +dependsOnPanels: List<String>
   }
 
-  class ContributionTypeSpec <<engine,record>> {
+  class ContributionSlot <<engine,record>> {
+    +name: String
     +schemaUri: URI
     +defaultResolver: ContributionResolver
+    +contributions: List<Contribution>
   }
 
+  ' Composition: Panel is a composite of ContributionSlots,
+  ' and each ContributionSlot owns its Contributions.
+  Panel "1" *-- "1..*" ContributionSlot : composes >
+  ContributionSlot "1" *-- "0..*" Contribution : holds >
+
   note bottom of Panel
-    **Panel** — Immutable record describing a typed region of the
-    Blackboard.
+    **Panel** — Typed region of the Blackboard, modelled as a
+    composite of `ContributionSlot`s.
 
     **Concept Semantics**:
 
-    - A Panel has no behaviour. It is the metadata the engine needs
-      to (a) accept Contributions into the right typed region, (b)
-      validate them against the per-contribution-type JSON Schema
-      bound in `contributionTypes[ct].schemaUri`, (c) resolve
-      conflicts with the per-contribution-type strategy bound in
-      `contributionTypes[ct].defaultResolver`, (d) walk the panel
-      DAG.
+    - A Panel is a *composite container*. Its `slots` map binds each
+      slot name to a `ContributionSlot` instance, and each
+      `ContributionSlot` in turn owns the live list of
+      `Contribution`s posted into it during a Run. The composition
+      arrows on the diagram are normative: `Panel →*→ ContributionSlot
+      →*→ Contribution`.
+    - The `(name, kind, dependsOnPanels)` triple plus the slot-map
+      shape (slot names + each slot's `schemaUri` and
+      `defaultResolver`) is the panel's static **registration**
+      metadata. The `contributions` list inside each slot is the
+      panel's **runtime** state, populated as a Run progresses.
     - Both engine-owned (target) and Pack-owned (source) panels are
       instances of THIS record. The engine ships no panel base class
       and no per-panel subclass. Differentiation is by `kind`
       (SOURCE_ANALYSIS vs TARGET_DEFINITION) as data; ownership
       (engine vs Pack) is derived from `kind`.
-    - A Panel declares a CLOSED map of contribution-type names →
-      `ContributionTypeSpec` records at registration time. One
-      contribution type = one entry in `contributionTypes`; one
-      Contribution belongs to exactly one `(panel, contributionType)`
-      pair.
+    - The slot map is CLOSED at Pack-registration time. One slot =
+      one entry in `slots`; one Contribution belongs to exactly one
+      `(panel, slot)` pair and is held in that slot's
+      `contributions` list.
     - The Panel knows its place in the engine-validated panel DAG
       via `dependsOnPanels`. The DAG is validated for acyclicity and
       cross-DAG-read containment at Pack registration.
@@ -211,13 +223,17 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       bridge to a target panel), and engine-vs-Pack ownership
       (TARGET_DEFINITION ⇒ engine-owned and sealed;
       SOURCE_ANALYSIS ⇒ Pack-owned).
-    - `contributionTypes`: closed map binding each accepted
-      contribution-type name to a `ContributionTypeSpec` carrying:
+    - `slots`: closed map binding each accepted slot name to a
+      `ContributionSlot` (a composite child of this Panel) carrying:
+      - `name`: the slot's name (same as the map key).
       - `schemaUri`: versioned `gsmarc://` URI of the JSON Schema
-        that every `Contribution.value` of that type MUST satisfy.
+        that every `Contribution.value` posted into this slot MUST
+        satisfy.
       - `defaultResolver`: the `ContributionResolver` strategy used
-        to fold competing Contributions of THIS type within this
-        panel. RunConfig may override per `(panel, contributionType)`.
+        to fold competing Contributions held by THIS slot. RunConfig
+        may override per `(panel, slot)`.
+      - `contributions`: live list of `Contribution`s posted into
+        this slot during the current Run.
       Engine-defined entries on engine-owned panels are sealed.
       Packs MAY add Pack-namespaced additive entries via
       `pack-manifest.extendsPanels[]`. Schema URIs resolve to
@@ -232,14 +248,14 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     - `kind = SOURCE_ANALYSIS` ⇒ `name` MUST be Pack-namespaced.
     - `kind = TARGET_DEFINITION` ⇒ panel MUST be declared by the
       engine itself (Pack manifests cannot declare TARGET_DEFINITION
-      panels in `panels[]`; only additive contribution-type entries
+      panels in `panels[]`; only additive slot entries
       are allowed via `extendsPanels[]`).
     - `dependsOnPanels` MUST NOT introduce a cycle in the DAG.
     - A bridging edge (source ⇒ target) is permitted only when the
       source panel has `kind = SOURCE_ANALYSIS` and the target panel
       has `kind = TARGET_DEFINITION`.
     - A Contribution accepted into this Panel MUST carry a
-      `contributionType` that is a key in `contributionTypes`; the
+      `slot` that is a key in `slots`; the
       Contribution's `value` MUST validate against the bound schema.
     - A Contribution with `determinism = NON_DETERMINISTIC` MUST
       carry `cacheKey` (I-4).
@@ -255,7 +271,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       `pack-manifest.panels[]` entries by the Blackboard Builder.
 
     **Decision Invariants — when to introduce a new Panel vs a new
-    contribution type** (engine-validated at Pack registration where
+    slot** (engine-validated at Pack registration where
     possible; complement to runtime invariants I-1..I-15 in the GSM
     Sourcing Blackboard skill)
 
@@ -273,12 +289,12 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       OR an engine stage (e.g. the Validation/Registration
       Pipeline reads `Confidence` even though no KS does). If no
       consumer exists distinct from the producer KS(s), the
-      candidate region is a contribution type of an existing panel,
+      candidate region is a slot of an existing panel,
       not a new panel.
     - **P-2 [HSII] Distinct DAG node**: a new Panel MUST occupy a
       distinct node in the panel DAG. If the candidate would have
       the same `dependsOnPanels` set AND the same downstream
-      readers as an existing panel, it is a contribution type of
+      readers as an existing panel, it is a slot of
       that panel.
     - **P-3 [GSM-S] Resolver granularity (DISSOLVED 2026-04)**:
       previously, GSM Sourcer attached the resolver at panel
@@ -286,23 +302,23 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       resolution strategy to become its own panel — a structural
       tension with P-2 (same-DAG-position aspects must share the
       panel). The resolver is now attached PER
-      `(panel, contributionType)` via
-      `contributionTypes[ct].defaultResolver`, with RunConfig
-      override key `resolvers."<Panel>.<ContributionType>"`. P-3 no
+      `(panel, slot)` via
+      `slots[ct].defaultResolver`, with RunConfig
+      override key `resolvers."<Panel>.<Slot>"`. P-3 no
       longer constrains panel-vs-type decisions. Retained as a
       named ID for traceability; effectively a no-op rule.
     - **P-4 [OVL] Override cascade boundary**: a USER_OVERRIDE on
-      any contribution type of a panel cascades to the panel's
+      any slot of a panel cascades to the panel's
       DAG-downstream consumers under one common cascade rule (per
       I-11). This is a GSM Sourcer governance-overlay rule with no
       Hearsay-II counterpart. Consequence: if the candidate aspect
       must cascade differently than the rest of the panel, it MUST
       be its own panel.
-    - **P-5 [HSII] Independent fillability**: contribution types of
+    - **P-5 [HSII] Independent fillability**: slots of
       the same panel MUST be fillable by independent KSs in any
       order. If two aspects MUST be co-asserted by the same KS in
       one Contribution (a transactional invariant), they are the
-      same contribution type, not two.
+      same slot, not two.
 
     Negative form (anti-patterns the registration validator does NOT
     catch but reviewers MUST):
@@ -311,7 +327,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       level into N panels with identical DAG positions, fragmenting
       the resolved view and forcing readers to do N-way joins.
     - **Panel-as-type** (P-1 violation): folding a distinct
-      abstraction level into a contribution type of an existing
+      abstraction level into a slot of an existing
       panel, hiding it from the DAG and denying its readers the
       ability to subscribe independently. (Pre-2026-04 this was
       also a P-3 violation; with P-3 dissolved, only P-1 still
@@ -359,10 +375,10 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     object "Definition : Panel" as DefinitionPanel {
       name = "Definition"
       kind = TARGET_DEFINITION
-      contributionTypes[Claim].schemaUri = gsmarc://gsm-sourcer/panels/Definition/Claim/v1
-      contributionTypes[Claim].defaultResolver = highestConfidence
-      contributionTypes[Merge].schemaUri = gsmarc://gsm-sourcer/panels/Definition/Merge/v1
-      contributionTypes[Merge].defaultResolver = collectAll
+      slots[Claim].schemaUri = gsmarc://gsm-sourcer/panels/Definition/Claim/v1
+      slots[Claim].defaultResolver = highestConfidence
+      slots[Merge].schemaUri = gsmarc://gsm-sourcer/panels/Definition/Merge/v1
+      slots[Merge].defaultResolver = collectAll
       dependsOnPanels = []
     }
 
@@ -375,7 +391,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
         subject (Structure, Mechanism, Effector, Receptor,
         Interaction, Archetype, Directive, Norm). Join key for every
         downstream target panel.
-      - Two contribution types (closed):
+      - Two slots (closed):
         - `Claim` — an `IdentificationKS` asserts an identity for a
           subject based on source-panel evidence. `value` carries
           `subjectKind` (DefinitionSubjectKind), `identityKey`
@@ -384,7 +400,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
           identities describe the same subject. `value` carries
           `supersedesIdentityKeys` (non-empty) and a surviving
           `targetIdentityKey`.
-      - Default resolvers (per contribution type): `Claim` →
+      - Default resolvers (per slot): `Claim` →
         `highestConfidence`, `Merge` → `collectAll`. Equally-
         confident
         `Claim`s on the same surface key escalate to a Checkpoint via
@@ -412,8 +428,8 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     object "Archetype : Panel" as ArchetypePanel {
       name = "Archetype"
       kind = TARGET_DEFINITION
-      contributionTypes[Application].schemaUri = gsmarc://gsm-sourcer/panels/Archetype/Application/v1
-      contributionTypes[Application].defaultResolver = collectAll
+      slots[Application].schemaUri = gsmarc://gsm-sourcer/panels/Archetype/Application/v1
+      slots[Application].defaultResolver = collectAll
       dependsOnPanels = [Definition]
     }
 
@@ -423,7 +439,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       **Concept Semantics**:
 
       - Captures which GSM Archetype(s) apply to a given Definition.
-        One contribution type (closed):
+        One slot (closed):
         - `Application` — an `ArchetypeKS` posts one archetype
           reference per Contribution. `value` carries `archetypeRef`
           (versioned `gsmarc://` URI of the GSM Archetype Definition).
@@ -443,8 +459,8 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     object "Statement : Panel" as StatementPanel {
       name = "Statement"
       kind = TARGET_DEFINITION
-      contributionTypes[Draft].schemaUri = gsmarc://gsm-sourcer/panels/Statement/Draft/v1
-      contributionTypes[Draft].defaultResolver = compose
+      slots[Draft].schemaUri = gsmarc://gsm-sourcer/panels/Statement/Draft/v1
+      slots[Draft].defaultResolver = compose
       dependsOnPanels = [Archetype]
     }
 
@@ -454,7 +470,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       **Concept Semantics**:
 
       - Holds populated GSM statement payloads conforming to the
-        resolved Archetype's JSON Schema. One contribution type
+        resolved Archetype's JSON Schema. One slot
         (closed):
         - `Draft` — a `StatementShapingKS` posts a partial or full
           statement payload. `value` carries `statement` (the
@@ -481,8 +497,8 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     object "Granularity : Panel" as GranularityPanel {
       name = "Granularity"
       kind = TARGET_DEFINITION
-      contributionTypes[Verdict].schemaUri = gsmarc://gsm-sourcer/panels/Granularity/Verdict/v1
-      contributionTypes[Verdict].defaultResolver = highestConfidence
+      slots[Verdict].schemaUri = gsmarc://gsm-sourcer/panels/Granularity/Verdict/v1
+      slots[Verdict].defaultResolver = highestConfidence
       dependsOnPanels = [Statement]
     }
 
@@ -493,7 +509,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       **Concept Semantics**:
 
       - Holds per-Definition consolidation verdicts AFTER Statement
-        shaping. One contribution type (closed):
+        shaping. One slot (closed):
         - `Verdict` — a `GranularityKS` posts one verdict per
           identity. `value.verdict` is one of `keep`, `drop`,
           `splitInto`, `mergeWith` (see `GranularityVerdict` enum).
@@ -517,8 +533,8 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     object "Evidence : Panel" as EvidencePanel {
       name = "Evidence"
       kind = TARGET_DEFINITION
-      contributionTypes[Signal].schemaUri = gsmarc://gsm-sourcer/panels/Evidence/Signal/v1
-      contributionTypes[Signal].defaultResolver = collectAll
+      slots[Signal].schemaUri = gsmarc://gsm-sourcer/panels/Evidence/Signal/v1
+      slots[Signal].defaultResolver = collectAll
       dependsOnPanels = [Statement]
     }
 
@@ -528,7 +544,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       **Concept Semantics**:
 
       - Aggregates positive or negative signals about a Definition's
-        Statement and surrounding context. One contribution type
+        Statement and surrounding context. One slot
         (closed):
         - `Signal` — an `EvidenceCollectionKS` posts one weighted
           signal per Contribution. `value.weight ∈ [-1, 1]`;
@@ -544,8 +560,8 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     object "Confidence : Panel" as ConfidencePanel {
       name = "Confidence"
       kind = TARGET_DEFINITION
-      contributionTypes[Score].schemaUri = gsmarc://gsm-sourcer/panels/Confidence/Score/v1
-      contributionTypes[Score].defaultResolver = highestConfidence
+      slots[Score].schemaUri = gsmarc://gsm-sourcer/panels/Confidence/Score/v1
+      slots[Score].defaultResolver = highestConfidence
       dependsOnPanels = [Evidence]
     }
 
@@ -556,7 +572,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
 
       - Holds the synthesised confidence score per Definition (and
         optionally per downstream target panel: Definition,
-        Archetype, Statement, Granularity). One contribution type
+        Archetype, Statement, Granularity). One slot
         (closed):
         - `Score` — a `ConfidenceSynthesisKS` posts one Score
           Contribution per identity. `value.score ∈ [0, 1]`;
@@ -614,7 +630,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
   class Contribution <<engine,record>> {
     +id: String
     +panel: String
-    +contributionType: String
+    +slot: String
     +value: JsonObject
     +targetIdentityKey: String
     +contributorKsId: URI
@@ -646,9 +662,12 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     - The unit of work on the Blackboard. Posted by a Knowledge
       Source (or by the Initializer for `INSTRUCTIONS_DERIVED`, or by
       a Reviewer at a Checkpoint for `USER_OVERRIDE`).
-    - Belongs to exactly ONE `(panel, contributionType)` pair, where
-      `contributionType` is a key in the panel's `contributionTypes`
-      map.
+    - Belongs to exactly ONE `(panel, slot)` pair, where
+      `slot` is a key in the panel's `slots`
+      map. The Contribution is HELD in that slot's `contributions`
+      list (composition is the navigational truth); the `panel` and
+      `slot` fields here are wire identifiers / back-references used
+      for serialization, dispatch, and audit.
     - The engine attaches `id`, `contributorKsId`, `kind`,
       `derivedFrom`, `createdAt`, `supersedes`. KSs cannot fabricate
       them.
@@ -672,9 +691,9 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
 
     **Validation Rules**:
 
-    - `(panel, contributionType)` MUST be a registered pair:
-      `contributionType` is a key in the named panel's
-      `contributionTypes` map; `value` MUST validate against the
+    - `(panel, slot)` MUST be a registered pair:
+      `slot` is a key in the named panel's
+      `slots` map; `value` MUST validate against the
       JSON Schema bound to that key.
     - `targetIdentityKey` is required when the named panel has
       `kind = TARGET_DEFINITION` (target panels are

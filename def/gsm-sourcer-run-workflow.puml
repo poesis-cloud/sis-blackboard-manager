@@ -86,22 +86,22 @@ loop until quiescence OR maxIterations OR completionPredicate
   alt DiscoveryKS fires
     KSs -> ExtT : execve scip-* / syft / tokei (sandboxed)
     ExtT --> KSs : output -> BundleStore
-    KSs -> BB : post Contribution(panel=SourceInventory|SourceUnit, contributionType=...)
+    KSs -> BB : post Contribution(panel=SourceInventory|SourceUnit, slot=...)
   else RelationKS fires
     KSs -> ExtT : joern-parse / scip relationships
-    KSs -> BB : post Contribution(panel=SourceRelation, contributionType=CallEdge|...)
+    KSs -> BB : post Contribution(panel=SourceRelation, slot=CallEdge|...)
   else InterfaceKS fires
-    KSs -> BB : post Contribution(panel=SourceInterface, contributionType=OpenApiOperation|...)
+    KSs -> BB : post Contribution(panel=SourceInterface, slot=OpenApiOperation|...)
   else IdentificationKS fires
     KSs -> BB : query SourceInterface / SourceUnit
     KSs -> RC : runContext().scope.includes(...)
-    KSs -> BB : post Contribution(panel=Definition, contributionType=Claim,\n  value={subjectKind, identityKey, supportingSourceIds})
+    KSs -> BB : post Contribution(panel=Definition, slot=Claim,\n  value={subjectKind, identityKey, supportingSourceIds})
   else ReconciliationKS fires
-    KSs -> BB : post Contribution(panel=Definition, contributionType=Merge,\n  supersedesIdentityKeys=[...])
+    KSs -> BB : post Contribution(panel=Definition, slot=Merge,\n  supersedesIdentityKeys=[...])
   else ArchetypeKS fires
     KSs -> BB : resolved(Definition, identity)
     KSs -> DefExp : (optional) navigate
-    KSs -> BB : post Contribution(panel=Archetype, contributionType=Application,\n  value={archetypeRef})
+    KSs -> BB : post Contribution(panel=Archetype, slot=Application,\n  value={archetypeRef})
   else StatementShapingKS fires
     KSs -> BB : resolved(Archetype, identity)
     alt LLM-driven
@@ -111,15 +111,15 @@ loop until quiescence OR maxIterations OR completionPredicate
       KSs -> KSs : structural extraction
     end
     KSs -> JV : incremental schema check
-    KSs -> BB : post Contribution(panel=Statement, contributionType=Draft)
+    KSs -> BB : post Contribution(panel=Statement, slot=Draft)
   else GranularityKS fires
     KSs -> BB : resolved(Statement, identity) + peers
-    KSs -> BB : post Contribution(panel=Granularity, contributionType=Verdict)
+    KSs -> BB : post Contribution(panel=Granularity, slot=Verdict)
   else EvidenceCollectionKS fires
-    KSs -> BB : post Contribution(panel=Evidence, contributionType=Signal)
+    KSs -> BB : post Contribution(panel=Evidence, slot=Signal)
   else ConfidenceSynthesisKS fires
     KSs -> BB : evidence + diagnostics
-    KSs -> BB : post Contribution(panel=Confidence, contributionType=Score)
+    KSs -> BB : post Contribution(panel=Confidence, slot=Score)
   end
 
   ' --- Conflict Resolution: per-panel ContributionResolver reconciles competing contributions ---

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/Definition/Claim/v1",
   "title": "DefinitionClaimValue",
-  "description": "Value of a Contribution posted onto the Definition panel with contributionType = Claim. An IdentificationKS asserts that one identityKey of one subjectKind defines a GSM subject (Structure, Mechanism, Effector, Receptor, Interaction, Archetype, Directive, Norm), backed by the listed source items. The Definition panel is the join key for every other target panel.",
+  "description": "Value of a Contribution posted onto the Definition panel with slot = Claim. An IdentificationKS asserts that one identityKey of one subjectKind defines a GSM subject (Structure, Mechanism, Effector, Receptor, Interaction, Archetype, Directive, Norm), backed by the listed source items. The Definition panel is the join key for every other target panel.",
   "type": "object",
   "required": [
     "subjectKind",

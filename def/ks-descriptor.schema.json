@@ -46,12 +46,12 @@
         "Confidence"
       ]
     },
-    "writesContributionTypes": {
+    "writesSlots": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "description": "Contribution-type names within writesPanel that this KS may post (subset of the keys of the panel's closed contributionTypes map)."
+      "description": "Contribution-type names within writesPanel that this KS may post (subset of the keys of the panel's closed slots map)."
     },
     "readsPanels": {
       "type": "array",
@@ -81,7 +81,7 @@
       "items": {
         "type": "string"
       },
-      "description": "Optional fast-pruning hint over contribution-type names of read panels."
+      "description": "Optional fast-pruning hint over slot names of read panels."
     },
     "parallelSafe": {
       "type": "boolean",

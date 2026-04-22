@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/Evidence/Signal/v1",
   "title": "EvidenceSignalValue",
-  "description": "Value of a Contribution posted onto the Evidence panel with contributionType = Signal. Additive corroboration per Definition. Default ContributionResolver = collectAll.",
+  "description": "Value of a Contribution posted onto the Evidence panel with slot = Signal. Additive corroboration per Definition. Default ContributionResolver = collectAll.",
   "type": "object",
   "required": [
     "targetIdentityKey",
