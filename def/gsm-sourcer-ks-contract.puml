@@ -35,10 +35,11 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
                                       StatementShapingKS | GranularityKS |
                                       EvidenceCollectionKS |
                                       ConfidenceSynthesisKS)
-    writesPanel : Panel              (one)
-    writesSlots : List<Slot>
-    readsPanels : List<Panel>        (subset of dependsOnPanels*)
-    triggerPredicate : DSL
+    writesPanel : String             (panel name; one)
+    writesSlots : List<String>
+    readsPanels : List<String>       (subset of dependsOnPanels*)
+    triggerPredicate : Class<? extends KsTriggerPredicate>
+                                     (FQN of a Java class)
     parallelSafe : boolean
     determinismDefault : enum        (DETERMINISTIC | NON_DETERMINISTIC)
     resolverHint : enum              (highestConfidence | firstWriter |
@@ -80,9 +81,9 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
   }
 
   interface BlackboardView <<read-only>> {
-    +Optional<Object> resolved(Panel p, String identityKey)
-    +List<Contribution> contributionsOf(Panel p, String identityKey)
-    +List<Contribution> contributionsOfSlot(Panel p, String slot)
+    +Optional<Object> resolved(String panelName, String identityKey)
+    +List<Contribution> contributionsOf(String panelName, String identityKey)
+    +List<Contribution> contributionsOfSlot(String panelName, String slot)
     +boolean contributedBy(URI ksId, String identityKey)
     +int evidenceCount(String identityKey)
     +void post(Contribution c)
@@ -90,7 +91,7 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
 
   class Contribution <<wire>> {
     id : String
-    panel : Panel
+    panel : String                   (panel name)
     slot : String
     targetIdentityKey : String?
     value : Object
@@ -112,37 +113,49 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
   InstructionsProvider --> InstructionsProviderDescriptor : declared by
 
   note as N_DSL
-    **triggerPredicate DSL (read-only structural)**
-    Operators: ==, !=, <, >, <=, >=, &&, ||, !, .size
-    Per-identity predicates:
-      panel == <Panel>
-      slot  == <Slot>
-      resolved(<Panel>, identity)
-      !resolved(<Panel>, identity)
-      contributedBy(self, identity)
-      !contributedBy(self, identity)
-      evidence(identity).size > N
-      runContext.scope.includes(identity)
-    Revision predicates (re-fire even when
-    upstream slot is already resolved):
-      confidenceBelow(identity, threshold)
-      statementAmbiguous(identity)
-      validationFailed(identity)
-    Aggregate (cross-identity) predicates:
-      count(<per-identity-predicate>) <op> N
+    **triggerPredicate (Java; no DSL)**
 
-    Examples:
-      panel == SourceInterface || panel == SourceUnit
-      panel == Definition && !resolved(Archetype, identity)
-      panel == Archetype && resolved(Definition, identity)
-        && !contributedBy(self, identity)
-      panel == Statement && resolved(Archetype, identity)
-        && runContext.scope.includes(identity)
-      panel == Confidence && resolved(Statement, identity)
-        && evidence(identity).size > 0
-      panel == Confidence && confidenceBelow(identity, 0.5)
-      count(panel == Definition
-        && !resolved(Archetype, identity)) > 5
+    Each KS supplies a Java class implementing the engine's
+    `KsTriggerPredicate` interface:
+
+      ```
+      interface KsTriggerPredicate {
+        boolean test(BlackboardView view,
+                     SourcingRunContext ctx);
+      }
+      ```
+
+    The Sourcer Controller invokes `test(...)` once per scheduling
+    tick to decide whether the KS is firable. Predicates are pure
+    reads against the typed `BlackboardView` and the frozen
+    `SourcingRunContext` — no string parsing, no scripting.
+
+    `BlackboardView` exposes the typed accessors a predicate needs:
+
+    Per-identity:
+      view.resolved(panelName, identityKey)
+      view.contributionsOf(panelName, identityKey)
+      view.contributionsOfSlot(panelName, slot)
+      view.contributedBy(thisKsId, identityKey)
+      view.evidenceOf(identityKey).size()
+      ctx.scope().includes(identityKey)
+
+    Revision (re-fire even when upstream is resolved):
+      view.confidenceBelow(identityKey, threshold)
+      view.statementAmbiguous(identityKey)
+      view.validationFailed(identityKey)
+
+    Aggregate (cross-identity):
+      view.count(predicate)
+
+    Example predicate body:
+
+      ```
+      // ArchetypeMatchingKS
+      return view.resolved("Definition", id) != null
+          && view.contributionsOf("Archetype", id).isEmpty()
+          && !view.contributedBy(thisKsId(), id);
+      ```
   end note
 
   note as N_Tools
