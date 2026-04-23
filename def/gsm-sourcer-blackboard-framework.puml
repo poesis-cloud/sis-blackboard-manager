@@ -299,9 +299,8 @@ frame "CD - GSM Sourcer - Blackboard Framework (generic Blackboard, Panel, Contr
 
     - `name`: slot name. Same string as the key under which this slot
       is registered in `panel.slots`. Stable identifier used by
-      `Contribution`-wire envelopes (`Contribution.slot` field in
-      `panels/Contribution.schema.json`) and by KS descriptors
-      (`writesSlots[]`).
+      `Contribution` records (`Contribution.slot` field) and by KS
+      descriptors (`writesSlots[]`).
     - `panel`: composite parent. Back-reference; the Panel
       determines the hosting Blackboard (`SourceBlackboard` /
       `TargetBlackboard`), DAG
@@ -690,9 +689,10 @@ frame "CD - GSM Sourcer - Blackboard Framework (generic Blackboard, Panel, Contr
     - Belongs to exactly ONE `ContributionSlot`. The `slot` field is
       the typed back-reference to its composite parent; the slot in
       turn knows its `panel`, so `(panel, slot)` is fully reachable
-      via `slot.panel.name + slot.name`. The JSON wire envelope in
-      `panels/Contribution.schema.json` carries `panel` and `slot`
-      as strings for serialization.
+      via `slot.panel.name + slot.name`. The `Contribution` Java
+      record (defined in `gsm-sourcer-blackboard-framework-contracts.puml`)
+      carries `panel` and `slot` as strings for cross-process audit
+      serialisation.
     - **Immutable + append-only**: a Contribution is NEVER mutated in
       place. To "change" a value, post a new Contribution; the old
       one remains in `slot.contributions` for audit. Multiple KSs

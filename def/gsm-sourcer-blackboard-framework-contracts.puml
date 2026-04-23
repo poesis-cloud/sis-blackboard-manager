@@ -319,6 +319,79 @@ frame "CD - GSM Sourcer - Blackboard Framework Contracts (engine-supplied interf
     KSs invoke via ctx.tool(name); engine returns
     a sandboxed handle. Output flows through BundleStore.
   end note
+
+  ' ============================================================
+  ' PLUG-IN DEPLOYMENT MANIFEST
+  ' (intra-JVM, Pack-side type; loaded by PluginLoader)
+  ' ============================================================
+
+  class PackManifest <<descriptor,record>> {
+    id : URI                         (versioned gsmarc:// URI of the Pack)
+    name : String
+    instructionsProvider : URI       (URI of the Pack's InstructionsProviderDescriptor)
+    panels : List<PanelDeclaration>  (Pack-owned Source Blackboard panels)
+    extendsPanels : Map<TargetPanel, Map<SlotName, SlotBinding>>
+                                     (additive slots onto engine-owned
+                                      Definition / Archetype / Statement)
+    knowledgeSources : List<URI>     (URIs of KS descriptors shipped by the Pack)
+    requestedExternalTools : List<ToolReq>
+    --
+    Engine-owned Target panels MUST NOT appear in `panels[]`;
+    use `extendsPanels` to add additive slots only.
+    Wave 9: dropped Granularity / Evidence / Confidence panels
+    are no longer accepted anywhere.
+  }
+
+  class PanelDeclaration <<descriptor,record>> {
+    name : String                    (Pack-namespaced; SHOULD match `<packPrefix>:<PanelName>`)
+    description : String?
+    slots : Map<SlotName, SlotBinding>   (closed; minProperties = 1)
+    dependencyPanels : List<String>      (DAG edges; engine-owned panel names allowed)
+  }
+
+  class SlotBinding <<descriptor,record>> {
+    schemaUri : URI                  (versioned gsmarc:// URI of the per-slot JSON Schema)
+    defaultResolver : ContributionResolver
+    --
+    Engine resolves `schemaUri` by looking up the resource bundled
+    in the Pack JAR at `/META-INF/gsmarc/<URI-path-tail>`; falls
+    back to the configured Schema Registry if any. No network fetch.
+    RunConfig may override `defaultResolver` per `(panel, slot)`.
+  }
+
+  class ToolReq <<value,record>> {
+    name : String
+    versionSpec : String
+  }
+
+  class Budget <<value,record>> {
+    wallClockMs : int?               (>= 1)
+    memoryMb : int?                  (>= 1)
+    inferenceTokens : int?           (>= 0)
+    defmanCalls : int?               (>= 0)
+  }
+
+  class Diagnostic <<value,record>> {
+    severity : enum                  (info | warning | error | fatal)
+    code : String
+    message : String
+    sourceKsId : URI?                (KS that emitted the diagnostic, if any)
+    context : Map<String, Object>?   (free-form payload)
+  }
+
+  ' ============================================================
+  ' RELATIONSHIPS (deployment + value composition)
+  ' ============================================================
+
+  PackManifest *-- "0..*" PanelDeclaration : panels
+  PackManifest *-- "0..*" ToolReq : requestedExternalTools
+  PanelDeclaration *-- "1..*" SlotBinding : slots
+  KnowledgeSourceDescriptor *-- "0..*" ToolReq : externalTools
+  KnowledgeSourceDescriptor *-- "0..1" Budget : budget
+  InstructionsProviderDescriptor *-- "0..*" ToolReq : externalTools
+  InstructionsProviderDescriptor *-- "0..1" Budget : budget
+  DiagnosticReporter ..> Diagnostic : reports
+  Contribution *-- "0..*" Diagnostic : diagnostics
 }
 
 @enduml
