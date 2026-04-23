@@ -22,7 +22,6 @@ skinparam noteBorderColor #57606A
 title GSM Sourcer - End-to-end Run workflow
 
 actor "Run Operator" as Op
-actor "Reviewer" as Rev
 
 participant "Sourcer API" as API
 participant "Initializer" as Init
@@ -30,8 +29,11 @@ participant "Plug-in Loader" as PL
 participant "Instructions\nProvider (Pack)" as IP
 participant "Scope/Focus\nBuilders" as SF
 participant "SourcingRunContext\n(immutable per Run;\nengine run state)" as RC
-participant "Control" as Ctrl
-participant "Blackboard\n(panels)" as BB
+participant "SourceController" as SCtrl
+participant "TargetController" as TCtrl
+participant "SourceBlackboard" as SBB
+participant "TargetBlackboard" as TBB
+participant "SourceFreeze\n(immutable bridge)" as SF
 participant "Resolver" as Res
 participant "Sandboxed KSs" as KSs
 participant "External Tools\n(allowlisted)" as ExtT
@@ -45,7 +47,7 @@ participant "RunLedger" as RL
 
 == Initialization (canonical step) ==
 
-Op -> API : POST /runs RunConfig\n{sourcingPacks[], profile,\n instructionsPayload,\n externalToolBindings,\n resolverOverrides, runInvariants,\n checkpoints}
+Op -> API : POST /runs RunConfig\n{sourcingPacks[], profile,\n instructionsPayload,\n externalToolBindings,\n resolverOverrides, runInvariants}
 API -> Init : startRun(runId, runConfig)
 
 group Initializer substeps
@@ -56,54 +58,63 @@ group Initializer substeps
   Init -> SF : buildScope(profile) ; buildFocus(scope, runConfig)
   SF --> Init : scope, focus
   Init -> RC : freeze(SourcingRunContext)
-  Init -> BB : Blackboard Builder substep\n(declare engine target spine\n + Pack source-side panels from manifest;\n validate panel DAG;\n instantiate empty panels)
+  Init -> SBB : Source Blackboard Builder\n(Pack panels + Pack abstractionLayers;\nvalidate Source DAG; instantiate)
+  Init -> TBB : Target Blackboard Builder\n(engine 3-panel spine:\nDefinition, Archetype, Statement;\nvalidate Target DAG; instantiate)
 end
 
 Init -> RL : record Run START
 
-== Checkpoint-0 (governance overlay; optional, post-Initialization) ==
+== Source phase: Activation + Execution + Conflict Resolution + Iteration ==
 
-alt runConfig.checkpoints.0 = true
-  Init -> RL : record CHECKPOINT_0_PENDING
-  Rev -> API : GET /runs/{id}/runContext
-  Rev -> API : POST /runs/{id}/checkpoint-0/{approve|reject}
-  alt rejected
-    API -> Ctrl : abort
-  end
-end
+loop until Source quiescence OR maxIterations OR completionPredicate
 
-== Activation + Execution + Conflict Resolution + Iteration (canonical loop) ==
+  SCtrl -> SBB : query state
+  SCtrl -> SCtrl : Activation:\n  enumerate eligible Source KSs\n  (targetBlackboard = source;\n   triggerPredicate true)
 
-loop until quiescence OR maxIterations OR completionPredicate
-
-  ' --- Activation: Control selects eligible KSs based on current Blackboard state ---
-  Ctrl -> BB : query state
-  Ctrl -> Ctrl : Activation:\n  enumerate eligible KSs\n  (triggerPredicate true)
-
-  ' --- Execution: activated KSs read inputs and post Contributions ---
-  Ctrl -> KSs : Execution:\n  fire eligible KSs\n  (parallelSafe in parallel)
+  SCtrl -> KSs : Execution: fire eligible Source KSs\n  (parallelSafe in parallel)
 
   alt DiscoveryKS fires
     KSs -> ExtT : execve scip-* / syft / tokei (sandboxed)
     ExtT --> KSs : output -> BundleStore
-    KSs -> BB : post Contribution(panel=SourceInventory|SourceUnit, slot=...)
+    KSs -> SBB : post Contribution(panel=<Pack:SourceInventory|SourceUnit>, slot=...)
   else RelationKS fires
     KSs -> ExtT : joern-parse / scip relationships
-    KSs -> BB : post Contribution(panel=SourceRelation, slot=CallEdge|...)
+    KSs -> SBB : post Contribution(panel=<Pack:SourceRelation>, slot=CallEdge|...)
   else InterfaceKS fires
-    KSs -> BB : post Contribution(panel=SourceInterface, slot=OpenApiOperation|...)
-  else IdentificationKS fires
-    KSs -> BB : query SourceInterface / SourceUnit
+    KSs -> SBB : post Contribution(panel=<Pack:SourceInterface>, slot=OpenApiOperation|...)
+  end
+
+  SCtrl -> Res : Conflict Resolution: reconcile per (panel, slot)
+  Res -> SBB : update resolved view
+end
+
+== Sequential bridge: SourceFreeze ==
+
+SCtrl -> SF : freeze(SourceBlackboard)\n  (deep-immutable snapshot:\n   panels, slots, contributions,\n   Pack-declared abstractionLayers)
+SCtrl -> RL : record Source phase END
+SF --> TCtrl : start Target phase
+
+== Target phase: Activation + Execution + Conflict Resolution + Iteration ==
+
+loop until Target quiescence OR maxIterations OR completionPredicate
+
+  TCtrl -> TBB : query state
+  TCtrl -> TCtrl : Activation:\n  enumerate eligible Target KSs\n  (targetBlackboard = target;\n   triggerPredicate true)
+
+  TCtrl -> KSs : Execution: fire eligible Target KSs
+
+  alt IdentificationKS fires
+    KSs -> SF : sourceFreeze.has(<Pack:SourceUnit>, identity)
     KSs -> RC : runContext().scope.includes(...)
-    KSs -> BB : post Contribution(panel=Definition, slot=Claim,\n  value={subjectKind, identityKey, supportingSourceIds})
+    KSs -> TBB : post Contribution(panel=Definition, slot=Claim,\n  value={subjectKind, identityKey, supportingSourceIds})
   else ReconciliationKS fires
-    KSs -> BB : post Contribution(panel=Definition, slot=Merge,\n  supersedesIdentityKeys=[...])
+    KSs -> TBB : post Contribution(panel=Definition, slot=Merge,\n  supersedesIdentityKeys=[...])
   else ArchetypeKS fires
-    KSs -> BB : resolved(Definition, identity)
+    KSs -> TBB : resolved(Definition, identity)
     KSs -> DefExp : (optional) navigate
-    KSs -> BB : post Contribution(panel=Archetype, slot=Application,\n  value={archetypeRef})
+    KSs -> TBB : post Contribution(panel=Archetype, slot=Application,\n  value={archetypeRef})
   else StatementShapingKS fires
-    KSs -> BB : resolved(Archetype, identity)
+    KSs -> TBB : resolved(Archetype, identity)
     alt LLM-driven
       KSs -> Inf : completeStatement(identity)\n  withTools({DEFMAN_EXPLORATION})
       Inf --> KSs : InferenceResult\n  (NON_DETERMINISTIC + cacheKey)
@@ -111,52 +122,31 @@ loop until quiescence OR maxIterations OR completionPredicate
       KSs -> KSs : structural extraction
     end
     KSs -> JV : incremental schema check
-    KSs -> BB : post Contribution(panel=Statement, slot=Draft)
-  else GranularityKS fires
-    KSs -> BB : resolved(Statement, identity) + peers
-    KSs -> BB : post Contribution(panel=Granularity, slot=Verdict)
-  else EvidenceCollectionKS fires
-    KSs -> BB : post Contribution(panel=Evidence, slot=Signal)
+    KSs -> TBB : post Contribution(panel=Statement, slot=Draft,\n  evidence=[EvidenceRef...])
+  else GranularityKS fires (TOP_DOWN)
+    KSs -> TBB : resolved(Statement, identity) + peers
+    KSs -> TBB : post Contribution(panel=Definition, slot=Verdict,\n  value={verdict: keep|drop|splitInto|mergeWith, ...})
   else ConfidenceSynthesisKS fires
-    KSs -> BB : evidence + diagnostics
-    KSs -> BB : post Contribution(panel=Confidence, slot=Score)
+    KSs -> TBB : contributionsOf(Statement, identity)
+    KSs -> TBB : post refined Contribution(panel=Statement, slot=Draft,\n  with synthesised confidence + evidence)
   end
 
-  ' --- Conflict Resolution: per-panel ContributionResolver reconciles competing contributions ---
-  Ctrl -> Res : Conflict Resolution:\n  reconcile per-panel
-  Res -> BB : update resolved view
-
-  ' --- Iteration: loop continues until quiescence or maxIterations ---
-end
-
-== Checkpoint-A (governance overlay; optional) ==
-
-Ctrl -> BS : snapshot Blackboard (Stage-A)
-Ctrl -> RL : record CHECKPOINT_A_PENDING
-Rev -> API : GET /runs/{id}/blackboard
-API --> Rev : Stage-A snapshot
-alt approve | override | reject
-  Rev -> API : decision
-  API -> Ctrl : apply (override -> Override Cascader)
+  TCtrl -> Res : Conflict Resolution: reconcile per (panel, slot)
+  Res -> TBB : update resolved view
 end
 
 == Pipeline: Validation (engine-only) ==
 
-loop for each Definition (with Granularity != drop)
-  Ctrl -> Pipe : validate(identity)
+loop for each Definition (with Definition.Verdict != drop)
+  TCtrl -> Pipe : validate(identity)
   Pipe -> JV : validate(resolved Statement, archetype schema)
   alt OK
     Pipe -> Pipe : produce ValidatedAscriptionDraft
   else failed
-    Pipe -> BB : post Diagnostic
+    Pipe -> TBB : post Diagnostic
     Pipe -> KSs : re-fire upstream (capped retries)
   end
 end
-
-== Checkpoint-B (governance overlay) ==
-
-Ctrl -> BS : snapshot Pipeline state (Stage-B)
-Rev -> API : approve | override | reject
 
 == Pipeline: Registration (engine-only) ==
 
@@ -168,8 +158,8 @@ end
 
 == Run end ==
 
-Ctrl -> BS : final snapshot
-Ctrl -> RL : record Run END
+TCtrl -> BS : final snapshot
+TCtrl -> RL : record Run END
 API --> Op : RunResult{registeredCount, diagnostics, bundleRef, ledgerRef}
 
 @enduml

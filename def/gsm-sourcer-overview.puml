@@ -21,17 +21,18 @@ skinparam noteBorderColor #57606A
 frame "PD - GSM Sourcer - System overview" {
 
   actor "Run Operator" as Op
-  actor "Reviewer\n(checkpoint)" as Rev
   actor "Pack Author" as Author
 
   package "GSM Sourcer engine\n(IT-domain agnostic, owns the meta-model + GSM target spine)" as Engine {
     component "Sourcer API\n(POST /runs)" as API
-    component "Initializer\n(substeps: Plug-in Loader,\n Instructions Provider invocation,\n Scope Builder, Focus Builder,\n freeze SourcingRunContext,\n Blackboard Builder)" as Init
-    component "Control\n(panel-DAG-aware scheduler;\nfires KSs whose triggerPredicate\nholds against Blackboard state)" as Ctrl
-    component "Blackboard\n(Source group + Target group panels;\nhypothesis-only)" as BB
-    component "ContributionResolver\n(per-panel; default + RunConfig overrides)" as Res
+    component "Initializer\n(substeps: Plug-in Loader,\n Instructions Provider invocation,\n Scope Builder, Focus Builder,\n freeze SourcingRunContext,\n Source + Target Blackboard Builders)" as Init
+    component "SourceController\n(panel-DAG-aware scheduler\nover SourceBlackboard;\nruns to quiescence first)" as SCtrl
+    component "TargetController\n(panel-DAG-aware scheduler\nover TargetBlackboard;\nstarts after SourceFreeze)" as TCtrl
+    component "SourceBlackboard\n(Pack-declared panels +\nPack-declared abstractionLayers;\nhypothesis-only)" as SBB
+    component "TargetBlackboard\n(engine-fixed 3-panel spine:\nDefinition, Archetype, Statement;\nhypothesis-only)" as TBB
+    component "SourceFreeze\n(deep-immutable snapshot of\nSourceBlackboard at quiescence;\nsequential bridge to Target)" as SF
+    component "ContributionResolver\n(per (panel, slot); default + RunConfig overrides)" as Res
     component "Pipeline\n(Validation -> Registration; engine-only)" as Pipe
-    component "Checkpoint Mediator\n(governance overlay A/B)" as Chk
     component "DefManClient\n(Registration only)" as DM
     component "BundleStore\n(snapshots; raw & derived artefacts)" as BS
     component "RunLedger\n(audit trail; resolver decisions)" as RL
@@ -49,38 +50,46 @@ frame "PD - GSM Sourcer - System overview" {
   Op --> API
   API --> Init
   Init --> IP : invoke once\n(returns instructionsPayload + profile)
-  Init --> BB : Blackboard Builder substep\n(declare engine target spine\n + Pack source-side panels;\n validate panel DAG;\n instantiate empty panels)
-  Init --> Ctrl : start
-  Ctrl --> KS : fire eligible KSs
-  KS --> BB : post Contribution(panel, slot, value)
+  Init --> SBB : Source Blackboard Builder\n(Pack panels + abstractionLayers)
+  Init --> TBB : Target Blackboard Builder\n(engine 3-panel spine)
+  Init --> SCtrl : start (Source phase)
+  SCtrl --> KS : fire eligible Source KSs
+  KS --> SBB : post Contribution\n(targetBlackboard = source)
+  SCtrl --> SF : freeze on Source quiescence
+  SF --> TCtrl : start (Target phase)
+  TCtrl --> KS : fire eligible Target KSs
+  KS --> SF : read frozen Source state\n(controlContext.sourceFreeze())
+  KS --> TBB : post Contribution\n(targetBlackboard = target)
   KS --> Inf : optional
   KS --> DefExp : optional (read-only)
   KS --> Tools : execve (sandboxed)
-  Ctrl --> Res : reconcile competing contributions
-  Ctrl --> Chk : Checkpoint-A (post-convergence)
-  Ctrl --> Pipe : hand converged target tuples
-  Pipe --> Chk : Checkpoint-B (post-validation)
+  SCtrl --> Res : reconcile (Source side)
+  TCtrl --> Res : reconcile (Target side)
+  TCtrl --> Pipe : hand converged target tuples
   Pipe --> DM : POST /ascriptions DRAFT
   Pipe --> RL : record per-stage outcomes
   Init --> BS : sourceContext snapshot
-  Rev --> Chk : approve / override / reject
 
   Author ..> Pack : authors KSs +\nInstructions Provider +\nsource-side panels
 
   note bottom of Engine
-    Engine ships: meta-model (Panel/Contribution/KS/InstructionsProvider),
-    target spine (Definition, Archetype, Statement, Granularity, Evidence,
-    Confidence), Initializer, Control, ContributionResolver, Pipeline,
-    Checkpoint Mediator, BundleStore, RunLedger, InferenceService,
+    Engine ships: meta-model (Blackboard/Panel/ContributionSlot/Contribution/
+    KS/InstructionsProvider/AbstractionLayer/SourceFreeze), the engine-fixed
+    Target spine (Definition, Archetype, Statement) with TargetLayer enum
+    (L_DEFINITION, L_ARCHETYPE, L_STATEMENT), Initializer, two Controllers
+    (Source + Target), Bridge (SourceFreeze production), ContributionResolver,
+    Pipeline, BundleStore, RunLedger, InferenceService,
     DefManExplorationService, DefManClient.
   end note
 
   note bottom of Pack
-    Pack ships: an Instructions Provider, source-side panel declarations
-    (panel name + closed slot set with per-type value schemas
-    + dependsOnPanels), and a set of KS descriptors. The Pack also declares
-    requestedExternalTools[] (upper bound). The operator's RunConfig
-    narrows tool bindings.
+    Pack ships: an Instructions Provider, Pack-declared abstractionLayers[]
+    ({id, rank, description}), Source-side panel declarations (panel name +
+    abstractionLayer id + closed slot set with per-slot value schemas +
+    dependsOnPanels), and a set of KS descriptors (each declaring
+    targetBlackboard = source|target and direction = BOTTOM_UP|TOP_DOWN).
+    The Pack also declares requestedExternalTools[] (upper bound); the
+    operator's RunConfig narrows tool bindings.
   end note
 }
 

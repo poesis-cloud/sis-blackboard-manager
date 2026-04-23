@@ -33,18 +33,21 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
                                       InterfaceKS | IdentificationKS |
                                       ReconciliationKS | ArchetypeKS |
                                       StatementShapingKS | GranularityKS |
-                                      EvidenceCollectionKS |
                                       ConfidenceSynthesisKS)
-    writesPanel : String             (panel name; one)
+    targetBlackboard : enum          (source | target)
+    direction : enum                 (BOTTOM_UP | TOP_DOWN; default BOTTOM_UP)
+    writesPanel : String             (panel name; one; must belong to targetBlackboard)
     writesSlots : List<String>
-    readsPanels : List<String>       (subset of dependsOnPanels*)
+    readsPanels : List<String>       (BOTTOM_UP: subset of dependsOnPanels*
+                                      TOP_DOWN: may include descendants;
+                                      sanctioned only for GranularityKS)
     triggerPredicate : Class<? extends KsTriggerPredicate>
                                      (FQN of a Java class)
     parallelSafe : boolean
     determinismDefault : enum        (DETERMINISTIC | NON_DETERMINISTIC)
     resolverHint : enum              (highestConfidence | firstWriter |
-                                      failOnConflict | userMediated |
-                                      collectAll)
+                                      failOnConflict |
+                                      collectAll | compose)
     inferenceServiceNeeded : boolean
     defmanExplorationNeeded : boolean
     externalTools : List<ToolReq>    (name + versionSpec)
@@ -52,6 +55,8 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
     --
     NO dependsOn : KSs are unaware of each other.
     Ordering is data-driven via triggerPredicate.
+    Engine routes the KS to SourceController or
+    TargetController based on targetBlackboard.
   }
 
   interface InstructionsProvider {
@@ -66,16 +71,17 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
     budget : Budget
     --
     Invoked exactly once per Run by Initializer,
-    BEFORE Control starts. Returns domain-specific
-    RunContext properties; NEVER writes the Blackboard.
+    BEFORE either Controller starts. Returns domain-specific
+    RunContext properties; NEVER writes to either Blackboard.
   }
 
   interface ControlContext <<runtime>> {
     +SourcingRunContext runContext()
-    +BlackboardView blackboard()
-    +InferenceService inference()      (if declared)
-    +DefManExplorationService defman() (if declared)
-    +Tool tool(String name)            (if declared + bound)
+    +BlackboardView blackboard()         (the Controller's targeted Blackboard)
+    +SourceFreezeView sourceFreeze()     (Target-side only; null on Source side)
+    +InferenceService inference()        (if declared)
+    +DefManExplorationService defman()   (if declared)
+    +Tool tool(String name)              (if declared + bound)
     +BundleStore bundleStore()
     +DiagnosticReporter diagnostics()
   }
@@ -85,31 +91,50 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
     +List<Contribution> contributionsOf(String panelName, String identityKey)
     +List<Contribution> contributionsOfSlot(String panelName, String slot)
     +boolean contributedBy(URI ksId, String identityKey)
-    +int evidenceCount(String identityKey)
     +void post(Contribution c)
   }
 
-  class Contribution <<wire>> {
+  interface SourceFreezeView <<read-only,immutable>> {
+    +boolean has(String packPanelName, String identityKey)
+    +List<Contribution> contributionsOf(String packPanelName, String identityKey)
+    +List<Contribution> contributionsOfSlot(String packPanelName, String slot)
+    +List<AbstractionLayer> abstractionLayers()
+  }
+
+  class Contribution <<wire,abstract>> {
     id : String
     panel : String                   (panel name)
     slot : String
-    targetIdentityKey : String?
     value : Object
     contributorKsId : URI            (engine-set)
     confidence : double [0..1]
-    rationale : String
-    determinism : enum
-    cacheKey : String                (required if NON_DETERMINISTIC)
+    rationale : String?
+    evidence : List<EvidenceRef>     (optional; replaces Wave-9-dropped Evidence panel)
+    cacheKey : String                (required if producing KS is NON_DETERMINISTIC)
     derivedFrom : List<String>
     supersedes : List<String>        (engine-set on override)
     diagnostics : List<Diagnostic>
     createdAt : Instant
+    --
+    Sealed over: SourceContribution (no extra fields, hosted on SourceBlackboard)
+              | TargetContribution (adds targetIdentityKey: String, hosted on TargetBlackboard).
+    No `kind` or `determinism` field on Contribution: provenance class is read
+    from contributorKsId; determinism is a property of the producing KS.
+  }
+
+  class EvidenceRef <<value>> {
+    source : String?     (URI, file path, or other identifier)
+    kind : String        (e.g. STATIC_SCAN, LLM_AGREEMENT, COUNTER_EXAMPLE)
+    weight : double      ([-1..1]; negative = counter-evidence)
+    note : String?
   }
 
   KnowledgeSource --> KnowledgeSourceDescriptor : declared by
   KnowledgeSource --> ControlContext : uses (sole IO)
   ControlContext --> BlackboardView
+  ControlContext --> SourceFreezeView : (Target side only)
   KnowledgeSource --> Contribution : returns 0..n
+  Contribution --> EvidenceRef : evidence
   InstructionsProvider --> InstructionsProviderDescriptor : declared by
 
   note as N_DSL
@@ -137,8 +162,11 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
       view.contributionsOf(panelName, identityKey)
       view.contributionsOfSlot(panelName, slot)
       view.contributedBy(thisKsId, identityKey)
-      view.evidenceOf(identityKey).size()
       ctx.scope().includes(identityKey)
+
+    Target-side only (read frozen Source):
+      ctx.sourceFreeze().has(packPanelName, identityKey)
+      ctx.sourceFreeze().contributionsOf(packPanelName, identityKey)
 
     Revision (re-fire even when upstream is resolved):
       view.confidenceBelow(identityKey, threshold)

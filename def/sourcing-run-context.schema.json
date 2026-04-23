@@ -119,11 +119,15 @@
           "highestConfidence",
           "firstWriter",
           "failOnConflict",
-          "userMediated",
           "collectAll",
           "compose"
         ]
       }
+    },
+    "granularityPolicy": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Frozen from RunConfig.granularityPolicy. Pack-typed payload accessed by Target-Blackboard `GranularityKS` (TOP_DOWN) via `controlContext.runContext().granularityPolicy()` to drive `Definition.Verdict` postings (`keep` / `drop` / `splitInto` / `mergeWith`). Wave 9: replaces the dropped Granularity panel's per-Run policy levers."
     },
     "externalToolBindings": {
       "type": "array",

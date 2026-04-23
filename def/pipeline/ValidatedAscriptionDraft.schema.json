@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/pipeline/ValidatedAscriptionDraft/v1",
   "title": "ValidatedAscriptionDraft",
-  "description": "Engine-internal Pipeline record produced by the Validation stage from a converged target-spine tuple (one Definition + its resolved Archetype/Statement/Granularity/Evidence/Confidence). NOT a Blackboard panel.",
+  "description": "Engine-internal Pipeline record produced by the Validation stage from a converged target-spine tuple (one Definition + its resolved Archetype + Statement). NOT a Blackboard panel. Wave 9: built from the 3-layer Target Blackboard (Definition / Archetype / Statement); the dropped Granularity panel's verdict is now sourced from the `Definition.Verdict` slot, the dropped Evidence panel's signals are sourced from the `Contribution.evidence` arrays attached on the contributing Statement Contributions, and the dropped Confidence panel's score is sourced from the resolved Statement Contribution's `confidence` value (after ConfidenceSynthesisKS folding via `compose`).",
   "type": "object",
   "required": [
     "id",
@@ -91,10 +91,7 @@
             "enum": [
               "Definition",
               "Archetype",
-              "Statement",
-              "Granularity",
-              "Evidence",
-              "Confidence"
+              "Statement"
             ]
           },
           "selectedContributionId": {
@@ -112,7 +109,6 @@
               "highestConfidence",
               "firstWriter",
               "failOnConflict",
-              "userMediated",
               "collectAll",
               "compose"
             ]

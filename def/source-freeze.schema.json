@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/source-freeze/v1",
+  "title": "SourceFreeze",
+  "description": "Immutable snapshot of the Source Blackboard taken at Source-phase quiescence (the bridge artefact between the Source Blackboard and the Target Blackboard). Wave 9 introduced two Blackboard instances (SourceBlackboard, TargetBlackboard) of the same generic Blackboard class, connected by a SEQUENTIAL bridge: the SourceController runs its Activation -> Execution -> Conflict-Resolution loop until quiescence (or completion-predicate / max-iterations), then the engine freezes the Source Blackboard's panels into a SourceFreeze and starts the TargetController. SourceFreeze is the read-only typed projection that Target-phase KSs see via `controlContext.sourceFreeze()` (a `SourceFreezeView`). Persisted in `BundleStore` as a versioned artefact for replay (I-12).",
+  "type": "object",
+  "required": [
+    "freezeId",
+    "runId",
+    "frozenAt",
+    "sourcePackUris",
+    "abstractionLayers",
+    "panels"
+  ],
+  "properties": {
+    "freezeId": {
+      "type": "string",
+      "description": "Engine-set unique id for this freeze artefact."
+    },
+    "runId": {
+      "type": "string",
+      "description": "Run id this SourceFreeze was produced by."
+    },
+    "frozenAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Wall-clock time of the freeze (set when SourceController declared quiescence)."
+    },
+    "sourcePackUris": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Versioned gsmarc:// URIs of the Sourcing Packs whose KSs and panels populated the Source Blackboard."
+    },
+    "abstractionLayers": {
+      "type": "array",
+      "description": "Snapshot of the Pack-declared abstractionLayers in effect during the Source phase. Echoed for self-describing replay.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "rank",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "panels": {
+      "type": "array",
+      "description": "Frozen panel snapshots. One entry per Source Blackboard panel. The `slots` map carries the resolved values per identity AND the full underlying Contribution log (so a Target KS may call either `resolved(panel, key)` or `contributionsOf(panel, key)` against the SourceFreezeView, mirroring the live Blackboard accessors).",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "abstractionLayer",
+          "slots"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "abstractionLayer": {
+            "type": "string"
+          },
+          "slots": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "required": [
+                "schemaUri",
+                "contributions"
+              ],
+              "properties": {
+                "schemaUri": {
+                  "type": "string"
+                },
+                "contributions": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "panels/Contribution.schema.json"
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

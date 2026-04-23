@@ -45,6 +45,11 @@
       "additionalProperties": true,
       "description": "Operator input forwarded verbatim to the Pack's Instructions Provider."
     },
+    "granularityPolicy": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Operator-supplied granularity policy for the Run. Pack-typed payload (engine forwards verbatim into the frozen SourcingRunContext). Read by `GranularityKS` (Target Blackboard, TOP_DOWN) via `controlContext.runContext().granularityPolicy()` to decide whether to post `Definition.Verdict` Contributions (`keep` / `drop` / `splitInto` / `mergeWith`) consolidating identities AFTER Statement shaping. Wave 9: replaces the dropped `Granularity` panel's per-Run policy levers; the per-identity verdicts now live as a slot on `Definition`."
+    },
     "resolverOverrides": {
       "type": "object",
       "description": "Per-panel resolver overrides keyed by panel name. `compose` performs schema-driven per-key merging of value objects (engine merge function over the resolved JSON Schema); use it for panels whose value carries independent fields contributed by multiple KSs (e.g. Statement).",
@@ -54,7 +59,6 @@
           "highestConfidence",
           "firstWriter",
           "failOnConflict",
-          "userMediated",
           "collectAll",
           "compose"
         ]
@@ -108,26 +112,6 @@
         "completionPredicate": {
           "type": "string",
           "description": "Optional 'satisfactory solution' stop criterion. Fully-qualified Java class name (loaded from a Pack JAR) implementing the engine's CompletionPredicate interface: `boolean test(BlackboardView view, SourcingRunContext ctx)`. When it returns true, Control short-circuits the Iteration loop even before quiescence. Implementations use the same BlackboardView Java accessors as KS triggerPredicates. There is NO string DSL."
-        }
-      },
-      "additionalProperties": false
-    },
-    "checkpoints": {
-      "type": "object",
-      "description": "Governance overlay checkpoints. Checkpoint-0 (post-Initialization) lets a Reviewer approve SourcingRunContext (scope/focus/profile) before any KS runs. A (post-convergence) and B (post-validation) suspend the Run for review/override/reject.",
-      "properties": {
-        "0": {
-          "type": "boolean",
-          "default": false,
-          "description": "Suspend after Initialization for SourcingRunContext approval before Control begins."
-        },
-        "A": {
-          "type": "boolean",
-          "default": false
-        },
-        "B": {
-          "type": "boolean",
-          "default": true
         }
       },
       "additionalProperties": false

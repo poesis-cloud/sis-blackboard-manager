@@ -2,12 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/pack-manifest/v1",
   "title": "SourcingPackManifest",
-  "description": "Manifest for a Sourcing Pack. Declares: the source-side panels the Pack contributes (each composed of a closed map of `ContributionSlot`s, where every slot owns its own JSON Schema, default resolver, and the Contributions posted into it during a Run), optional additive slots the Pack adds onto engine-owned target panels (also as a name -> ContributionSlot map), KS list, optional Instructions Provider, requested external tools (upper bound). Engine validates the panel DAG (engine-owned target panels + Pack-owned source panels + Pack slot extensions) at registration; cycles are rejected. Pack-owned source-panel names SHOULD be Pack-namespaced (e.g. `itip:SourceUnit`); when two Packs in the same Run declare the same panel name with non-identical `slots` map, the engine rejects registration (collision). Identical panel declarations across Packs are merged silently.",
+  "description": "Manifest for a Sourcing Pack. Declares: the abstraction layers the Pack stratifies its Source Blackboard panels into (informational stratification metadata; the panel DAG remains the operational truth), the source-side panels the Pack contributes (each assigned to one of the Pack's declared abstractionLayers and composed of a closed map of `ContributionSlot`s, where every slot owns its own JSON Schema, default resolver, and the Contributions posted into it during a Run), optional additive slots the Pack adds onto engine-owned Target Blackboard panels (Definition/Archetype/Statement only -- Granularity/Evidence/Confidence panels were removed in Wave 9), KS list, optional Instructions Provider, requested external tools (upper bound). Engine validates the panel DAG (Pack-owned source panels + engine-owned target panels + Pack slot extensions) at registration; cycles are rejected. Pack-owned source-panel names SHOULD be Pack-namespaced (e.g. `itip:SourceUnit`); when two Packs in the same Run declare the same panel name with non-identical `slots` map, the engine rejects registration (collision). Identical panel declarations across Packs are merged silently. Pack-declared `abstractionLayers` are local to the Pack; cross-Pack layer reconciliation is the operator's responsibility.",
   "type": "object",
   "required": [
     "id",
     "name",
     "instructionsProvider",
+    "abstractionLayers",
     "panels",
     "knowledgeSources"
   ],
@@ -23,13 +24,42 @@
       "type": "string",
       "description": "URI of the Pack's Instructions Provider descriptor."
     },
+    "abstractionLayers": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Pack-declared abstraction layers stratifying this Pack's Source Blackboard panels. Each entry describes one layer with a Pack-local id (referenced by `panels[].abstractionLayer`), an integer `rank` (lower = less integrated / more concrete; higher = more integrated / closer to a usable answer), and a free-text description. Layers are INFORMATIONAL stratification metadata for visualization, reasoning, and cross-Pack analysis; they DO NOT enforce data flow -- the panel DAG (`dependsOnPanels`) remains the operational truth. Recommended (but not required) convention for software-repository Packs: rank 0 `raw` (file tree, AST tokens), rank 1 `micro` (functions, classes), rank 2 `meso` (modules, services), rank 3 `macro` (bounded contexts, capabilities), rank 4 `intent` (responsibility, behavioural semantics). Each Pack MAY adopt any naming and rank set that fits its source domain. The engine-owned Target Blackboard has its OWN fixed 3-layer enum (L_DEFINITION / L_ARCHETYPE / L_STATEMENT) declared by the engine; `abstractionLayers` here applies only to the Pack's Source-side panels.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "rank",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Pack-local layer identifier referenced by `panels[].abstractionLayer`."
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Ordering rank within this Pack's layer stack. Lower = less integrated / more concrete; higher = more integrated / closer to answer."
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "panels": {
       "type": "array",
-      "description": "Pack-owned source-side panel declarations. Engine-owned target-spine panels (Definition/Archetype/Statement/Granularity/Evidence/Confidence) MUST NOT appear here; use `extendsPanels` to add additive slots onto them.",
+      "description": "Pack-owned Source Blackboard panel declarations. Engine-owned Target Blackboard panels (Definition/Archetype/Statement) MUST NOT appear here; use `extendsPanels` to add additive slots onto them. The dropped Granularity/Evidence/Confidence panels (Wave 9 removal) are no longer accepted anywhere.",
       "items": {
         "type": "object",
         "required": [
           "name",
+          "abstractionLayer",
           "slots",
           "dependsOnPanels"
         ],
@@ -37,6 +67,10 @@
           "name": {
             "type": "string",
             "description": "Pack-namespaced panel name. SHOULD match `<packPrefix>:<PanelName>` (e.g. `itip:SourceUnit`); engine collision-rejects identical names with non-identical slots maps across Packs."
+          },
+          "abstractionLayer": {
+            "type": "string",
+            "description": "Layer id this panel belongs to. MUST be the `id` of one of this Pack's `abstractionLayers[]` entries (engine-validated at Pack registration)."
           },
           "slots": {
             "type": "object",
@@ -58,7 +92,6 @@
                     "highestConfidence",
                     "firstWriter",
                     "failOnConflict",
-                    "userMediated",
                     "collectAll",
                     "compose"
                   ],
@@ -82,7 +115,14 @@
     },
     "extendsPanels": {
       "type": "object",
-      "description": "Optional additive slots the Pack registers onto engine-owned panels (Definition/Archetype/Statement/Granularity/Evidence/Confidence). Each value is a map binding a Pack-namespaced slot name (e.g. `itip:Refined`) to a `ContributionSlot` (composite child holding `{schemaUri, defaultResolver}` plus the live `contributions` list at runtime). Engine-defined slots remain closed and cannot be redefined. Use case: a domain Pack augments Statement with a refinement slot that downstream domain KSs read alongside the engine-defined Draft slot.",
+      "description": "Optional additive slots the Pack registers onto engine-owned Target Blackboard panels (Definition/Archetype/Statement). Each value is a map binding a Pack-namespaced slot name (e.g. `itip:Refined`) to a `ContributionSlot` (composite child holding `{schemaUri, defaultResolver}` plus the live `contributions` list at runtime). Engine-defined slots remain closed and cannot be redefined. The Granularity/Evidence/Confidence panels are no longer engine-owned (Wave 9 removal): Granularity policy lives in `RunConfig.granularityPolicy`, evidence is now an optional `Contribution.evidence` property, and confidence is the per-Contribution `confidence` value (synthesis is a regular Statement-shaping KS). Use case: a domain Pack augments Statement with a refinement slot that downstream domain KSs read alongside the engine-defined Draft slot.",
+      "propertyNames": {
+        "enum": [
+          "Definition",
+          "Archetype",
+          "Statement"
+        ]
+      },
       "additionalProperties": {
         "type": "object",
         "propertyNames": {
@@ -105,7 +145,6 @@
                 "highestConfidence",
                 "firstWriter",
                 "failOnConflict",
-                "userMediated",
                 "collectAll",
                 "compose"
               ],

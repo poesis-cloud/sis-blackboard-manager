@@ -23,7 +23,7 @@ title GSM Sourcer - Contribution & Definition lifecycle
 note as N_Legend
   Two intertwined lifecycles:
   (1) Contribution lifecycle - every Contribution on every panel
-      goes through Posted -> Considered -> Winning | Superseded | Diagnosed.
+      goes through Posted -> Considered -> Winning | Losing | Diagnosed.
   (2) Definition lifecycle - a Definition exists once its panel
       has at least one accepted Contribution (Claim or Merge);
       "convergence" is reached when no panel for it gains new
@@ -51,16 +51,11 @@ state Considered {
 
 Considered --> Winning : selected by resolver
 Considered --> Losing : not selected\n(kept for audit)
-Considered --> Conflicted : resolver = failOnConflict\nand multiple contributions
-Considered --> EscalatedToCheckpoint : resolver = userMediated\nand multiple contributions
+Considered --> Diagnosed : resolver = failOnConflict\nand multiple contributions\n(Run aborts)
 
-Winning --> Superseded : new Contribution wins\nor user override
 Winning --> [*] : Run ends with this winning
 
 Losing --> Considered : new Contribution arrives\n-> resolver re-evaluates
-Conflicted --> EscalatedToCheckpoint : Control routes to\nCheckpoint-A
-EscalatedToCheckpoint --> Winning : user picks one\n(or appends override\nas a new Contribution)
-EscalatedToCheckpoint --> Superseded : user drops this contribution
 
 Posted --> Diagnosed : engine validation rejects\n(e.g. cacheKey missing,\nslot not in panel)
 Diagnosed --> [*]
@@ -76,59 +71,28 @@ state "Definition lifecycle" as DEF {
   [*] --> NotYetIdentified
 
   state "Identified\n(>= 1 Definition.Claim)" as Identified
-  NotYetIdentified --> Identified : IdentificationKS posts\nDefinition.Claim for identityKey K
+  NotYetIdentified --> Identified : IdentificationKS\nreads SourceFreeze\n+ posts Definition.Claim for identityKey K
   Identified --> Identified : ReconciliationKS posts\nDefinition.Merge
 
-  state "PanelsAccreting\n(target panels gain Contributions:\nArchetype / Statement / Granularity /\nEvidence / Confidence)" as PanelsAccreting
+  state "PanelsAccreting\n(Target panels gain Contributions:\nArchetype.Application / Statement.Draft;\nGranularityKS may post Definition.Verdict\n(TOP_DOWN); ConfidenceSynthesisKS may post\nrefined Statement.Draft with synthesised\nconfidence + evidence)" as PanelsAccreting
   Identified --> PanelsAccreting : trigger predicates fire
 
   state "Quiescent\n(no new Contributions for\nN consecutive iterations)" as Quiescent
   PanelsAccreting --> Quiescent : Convergence Detector
 
-  state "AwaitingCheckpointA" as CA
-  Quiescent --> CA : if checkpoints.A
-  Quiescent --> ReadyForPipeline : if not checkpoints.A
-
-  state CA {
-    state "Reviewing" as CA_Review
-    state "Approved" as CA_Approved
-    state "Override applied" as CA_Override
-    state "Rejected" as CA_Rejected
-    CA_Review --> CA_Approved : user: approve
-    CA_Review --> CA_Override : user: append\nuser-mediated\nContribution
-    CA_Review --> CA_Rejected : user: drop identity
-  }
-
-  CA_Approved --> ReadyForPipeline
-  CA_Override --> PanelsAccreting : Override Cascader\nre-fires triggers
-  CA_Rejected --> Dropped
+  state ReadyForPipeline
+  Quiescent --> ReadyForPipeline
 
   state Dropped <<end>>
-  state ReadyForPipeline
 
   ReadyForPipeline --> Validating : Pipeline picks up\nresolved tuple
 
   state Validating
-  Validating --> AwaitingCheckpointB : OK
+  Validating --> Registering : OK
   Validating --> PanelsAccreting : failed\n-> diagnostic + re-fire
-
-  state AwaitingCheckpointB
-  AwaitingCheckpointB --> Registering : approved
-  AwaitingCheckpointB --> PanelsAccreting : override (cascade)
-  AwaitingCheckpointB --> Dropped : rejected
 
   state Registering
   Registering --> [*] : DefMan DRAFT registered
 }
-
-note right of CA
-  Checkpoints A and B are GOVERNANCE OVERLAYS, not part
-  of the canonical Blackboard pattern. They suspend the
-  Run for user mediation. Override = append a new
-  Contribution (confidence = 1.0, contributorKsId = user)
-  that supersedes the prior winner. The Override Cascader
-  invalidates dependent resolved values across panels and
-  re-fires triggers.
-end note
 
 @enduml

@@ -8,9 +8,7 @@ External artifacts are **definitions in their native form**. Code defines struct
 
 ### "Source artifacts ARE definitions"
 
-The GSM Sourcer does not *interpret* or *describe* external artifacts — it **translates** them. A Java service class IS a Component with Mechanisms. An ISO norm article IS a Directive. A GDPR obligation IS a Policy. The sourcer performs a faithful structural translation from the source's native definitional language into GSM's universal definitional language.
-
-This is distinct from Description-plane observation (DSM). DSM observes runtime state and behavior. The GSM Sourcer operates entirely within the Definition plane: it takes definitional artifacts as input and produces definitional primitives as output.
+The GSM Sourcer *translates* external artifacts. Java service class IS a Component with Mechanisms. An ISO norm article IS a Directive. A GDPR obligation IS a Policy. The sourcer performs a faithful structural translation from the source's native definitional language into GSM's universal definitional language.
 
 ### Generic core, domain-specific source adapters
 

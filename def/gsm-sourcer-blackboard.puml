@@ -25,82 +25,106 @@ skinparam objectFontColor #24292F
 skinparam noteBackgroundColor #FFF8C5
 skinparam noteBorderColor #57606A
 
-frame "CD - GSM Sourcer - Blackboard panel topology" {
+frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
 
   ' ============================================================
-  ' BLACKBOARD NOTE
+  ' BLACKBOARDS NOTE
   ' ============================================================
 
   note as BlackboardNote
-    **Blackboard — Shared problem-solving workspace (engine-owned)**
+    **Two Blackboards (Source + Target) of one generic class, bridged
+    by a sequential SourceFreeze snapshot**
 
-    The Blackboard is the GSM Sourcer realisation of the canonical
-    Blackboard pattern's "shared memory". It is a strictly typed,
-    panel-graph-aware data structure on which independent Knowledge
-    Sources (KSs) post **Contributions** under the supervision of the
-    Sourcer Controller. The Controller is **panel-graph-agnostic in
-    semantics** — it knows only the declared DAG and each KS's Java
+    GSM Sourcer realises the Blackboard pattern as **two instances**
+    of a single generic `Blackboard` class:
+
+    - **`SourceBlackboard`** -- owned by the Sourcing Pack(s); hosts
+      the Pack-declared source-analysis panels, stratified by the
+      Pack's own declared **abstraction layers**.
+    - **`TargetBlackboard`** -- owned by the engine; hosts the GSM
+      target spine as a **3-layer fixed stack**: `L_DEFINITION`
+      (identity claims), `L_ARCHETYPE` (classification), `L_STATEMENT`
+      (fully populated body).
+
+    A single generic `Controller` class is also instantiated twice
+    (`SourceController`, `TargetController`); each runs its own
+    Activation -> Execution -> Conflict-Resolution loop until
+    quiescence (or `runInvariants.completionPredicate` /
+    `maxIterations`). The two phases run **sequentially**: Source
+    quiesces, the engine **freezes** the SourceBlackboard into an
+    immutable `SourceFreeze` artefact, then the TargetController
+    starts. Target-phase KSs read frozen Source state via
+    `controlContext.sourceFreeze()` (a `SourceFreezeView`); they
+    cannot post back to the Source Blackboard.
+
+    The Controllers remain **panel-graph-agnostic in semantics** --
+    they know only the declared panel DAG of their Blackboard
+    instance and each KS's Java
     `triggerPredicate(BlackboardView, SourcingRunContext)` method,
     not what any panel means.
 
     **One Java type for all panels.** A panel has no behaviour; it is
-    metadata describing a typed region of the Blackboard. The engine
-    therefore models every panel — engine-owned target panel and
-    Pack-owned source panel alike — as one Java record
-    `Panel` with fields `(name, kind, slots, dependsOnPanels)`,
-    where `slots` maps each slot name to a `ContributionSlot`. A
-    `ContributionSlot` is itself a composite child of the Panel: it
-    carries the per-slot JSON Schema URI and `defaultResolver`
-    (registration-time metadata) AND owns the live list of
-    `Contribution`s posted into it during a Run (runtime state).
-    There is no class hierarchy,
-    no abstract `SourceAnalysisPanel`, no abstract
-    `TargetDefinitionPanel`, no per-panel concrete subclass.
-    Differentiation is by the `kind` field, not by Java type.
-    Engine-vs-Pack ownership is derived from `kind`
-    (TARGET_DEFINITION ⇒ engine; SOURCE_ANALYSIS ⇒ Pack); the
+    metadata describing a typed region of one Blackboard. The engine
+    therefore models every panel as one Java record
+    `Panel` with fields `(name, blackboard, abstractionLayer, slots,
+    dependsOnPanels)`, where `slots` maps each slot name to a
+    `ContributionSlot`. There is no class hierarchy, no abstract
+    `SourceAnalysisPanel`, no abstract `TargetDefinitionPanel`, no
+    per-panel concrete subclass. Differentiation is by which
+    `Blackboard` instance hosts the panel (`blackboard` back-reference);
+    engine-vs-Pack ownership is derived from the blackboard
+    (`TargetBlackboard` ⇒ engine; `SourceBlackboard` ⇒ Pack); the
     registration validator enforces this and rejects Pack-declared
-    target panels.
+    Target panels.
 
     **Boundary at registration, not at compile time.** Because Packs
     contribute panels as data (entries in `pack-manifest.panels[]`),
-    the Sourcer Controller has zero compile-time dependency on Pack
-    code for panel definitions. Pack-owned KS Java classes still load
-    in sandboxed classloaders, but no Pack class extends a panel
-    abstract — the engine's `PanelRegistry` accepts a `Panel` record
+    the engine has zero compile-time dependency on Pack code for
+    panel definitions. Pack-owned KS Java classes still load in
+    sandboxed classloaders, but no Pack class extends a panel
+    abstract -- the engine's `PanelRegistry` accepts a `Panel` record
     regardless of who declared it, and enforces invariants at
-    registration time (`kind = SOURCE_ANALYSIS` ⇒ name MUST be
-    Pack-namespaced;
-    `kind = TARGET_DEFINITION` ⇒ `owner` MUST be `ENGINE`; etc.).
+    registration time (`blackboard = SourceBlackboard` ⇒ `name` MUST
+    be Pack-namespaced AND `abstractionLayer` MUST be one of the
+    Pack's declared layer ids; `blackboard = TargetBlackboard` ⇒
+    panel MUST be one of the engine's three reserved Definition /
+    Archetype / Statement panels; etc.).
 
     ====
 
-    **Two panel kinds**
+    **Abstraction layers (panel stratification metadata)**
 
-    1. **Source analysis panels** (`kind = SOURCE_ANALYSIS`,
-       Pack-owned). Capture the source-side analysis of the artefact
-       under sourcing — files, units, relations, interfaces. Each
-       Pack ships its own panel instances in `pack-manifest.panels[]`.
-       The engine ships none. The Repository Sourcing Pack (in
-       `itip/`) currently declares four: `itip:SourceInventory`,
-       `itip:SourceUnit`, `itip:SourceRelation`, `itip:SourceInterface`.
-    2. **Target definition panels** (`kind = TARGET_DEFINITION`,
-       engine-owned). Carry the GSM spine — Definition, Archetype,
-       Statement, Granularity, Evidence, Confidence. They are sealed:
-       tenants MAY add Pack-namespaced additive slots
-       via `pack-manifest.extendsPanels[]` but MAY NOT redefine
-       engine-defined slots or add new target panels at
-       runtime.
+    Each panel declares an `abstractionLayer` id. Layers are
+    **informational stratification metadata** (visualization,
+    cross-Pack reasoning); they DO NOT enforce data flow -- the panel
+    DAG (`dependsOnPanels`) remains the operational truth. Convention
+    across both Blackboards: **lower rank = less integrated / more
+    concrete; higher rank = more integrated / closer to a usable
+    answer.**
+
+    - **Source side**: each Sourcing Pack declares its own
+      `abstractionLayers[]` in its manifest (`{id, rank, description}`
+      entries). Engine validates each Source panel's
+      `abstractionLayer` is one of the Pack's declared layer ids.
+      Recommended (NOT enforced) convention for software-repository
+      Packs: rank 0 `raw` (file tree, AST tokens), rank 1 `micro`
+      (functions, classes), rank 2 `meso` (modules, services), rank 3
+      `macro` (bounded contexts, capabilities), rank 4 `intent`
+      (responsibility, behavioural semantics).
+    - **Target side**: the engine ships a fixed 3-layer enum
+      `TargetLayer` = { `L_DEFINITION` (rank 0), `L_ARCHETYPE`
+      (rank 1), `L_STATEMENT` (rank 2) }. Pack `extendsPanels[]`
+      additive slots inherit the host panel's layer.
 
     ====
 
-    **Closed slot sets**
+    **Slot ontology (closed slot sets)**
 
     Every `Panel` declares a closed `slots` map at
     Pack-registration time. Each entry binds a slot
-    name (e.g. `Claim`, `Merge`, `Verdict`) to the JSON Schema URI
-    that validates Contributions of that type. A `Contribution`
-    belongs to exactly one `(panel, slot)` pair, with
+    name (e.g. `Claim`, `Verdict`, `Application`, `Draft`) to the
+    JSON Schema URI that validates Contributions of that type. A
+    `Contribution` belongs to exactly one `(panel, slot)` pair, with
     the slot name drawn from the panel's closed map.
     Adding a slot at Run time is rejected (invariant
     I-3 in the GSM Sourcing Blackboard skill). There is NO
@@ -108,54 +132,142 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
 
     ====
 
+    **Dropped panels (Wave 9)**
+
+    Three panels were removed from the Target Blackboard ontology in
+    Wave 9. Their semantics were not lost -- they were re-homed onto
+    structures that already carried the right shape:
+
+    - **`Granularity`** -> dropped as a panel. Per-Run policy moved
+      to `RunConfig.granularityPolicy` (Pack-typed). Per-identity
+      verdicts moved to a new **`Definition.Verdict`** slot, posted
+      by a `GranularityKS` declared `direction = TOP_DOWN` (reads
+      Statement, writes Definition.Verdict). Precedence over the
+      identity-time `Definition.Merge` slot is preserved.
+    - **`Evidence`** -> dropped as a panel. Replaced by an optional
+      `Contribution.evidence: List<EvidenceRef>` property attached by
+      any KS that has evidence to attach.
+    - **`Confidence`** -> dropped as a panel. Synthesis is now done by
+      `ConfidenceSynthesisKS` posting a refined Statement
+      Contribution whose `confidence` value reflects the synthesis;
+      folded into the resolved Statement by the `compose` resolver.
+      The per-Contribution `confidence` field (already mandatory)
+      carries the score.
+
+    ====
+
     **Conflict resolution and the resolved view**
 
-    Each panel declares a default `ContributionResolver`. KSs may post
-    multiple competing Contributions for the same `(panel,
-    slot, identityKey)` triple; the resolver collapses them
+    Each `(panel, slot)` declares a default `ContributionResolver`.
+    KSs may post multiple competing Contributions for the same
+    `(panel, slot, identityKey)` triple; the resolver collapses them
     into a single resolved value visible via
     `BlackboardView.resolved(panel, identityKey)`. Resolvers:
     `highestConfidence`, `firstWriter`, `failOnConflict`,
-    `userMediated`, `collectAll`, `compose` (schema-driven per-key
-    merge of value objects — used by Statement so multiple
+    `collectAll`, `compose` (schema-driven per-key
+    merge of value objects -- used by Statement so multiple
     StatementShapingKSs can populate disjoint archetype fields).
     `ConfidenceSynthesisKS`, `ReconciliationKS`, and ensemble KSs MUST
-    use `BlackboardView.contributionsOf(panel, identityKey)` instead —
+    use `BlackboardView.contributionsOf(panel, identityKey)` instead --
     `resolved` would already have collapsed the diversity those KSs
     need to reason over.
 
     ====
 
-    **Engine run state distinct from the Blackboard**
+    **Engine run state distinct from the Blackboards**
 
-    The Run input (operator intent, scope, focus, profile, resolver
-    overrides, external tool bindings, run invariants) does NOT live on
-    the Blackboard as a confidence-1.0 hypothesis (a deliberate
-    departure from Hearsay-II). It lives in `SourcingRunContext` — a
-    **frozen run-scoped engine value, distinct from the Blackboard** —
-    accessed via `controlContext.runContext()`.
+    The Run input (operator intent, scope, focus, profile,
+    granularity policy, resolver overrides, external tool bindings,
+    run invariants) does NOT live on either Blackboard as a
+    confidence-1.0 hypothesis (a deliberate departure from
+    Hearsay-II). It lives in `SourcingRunContext` -- a **frozen
+    run-scoped engine value, distinct from the Blackboards** --
+    accessed via `controlContext.runContext()`. The `SourceFreeze`
+    artefact (Source Blackboard's frozen state at quiescence) is
+    *also* distinct from `SourcingRunContext` and is accessed via the
+    separate `controlContext.sourceFreeze()` accessor by Target-phase
+    KSs.
 
     ====
 
     **Panel DAG (engine-validated at Pack registration)**
 
+    Each Blackboard has its own DAG.
+
+    Source Blackboard (Pack-defined; example for the ITIP Repository
+    Sourcing Pack):
     ```
     itip:SourceInventory  ->  itip:SourceUnit
     itip:SourceUnit       ->  itip:SourceInterface
     itip:SourceUnit       ->  itip:SourceRelation
-    {itip:SourceInterface, itip:SourceUnit, itip:SourceRelation}
-                          ->  Definition  <<bridge>>
-    Definition            ->  Archetype
-    Archetype             ->  Statement
-    Statement             ->  Granularity
-    Statement             ->  Evidence
-    Evidence              ->  Confidence
     ```
 
-    A KS's `readsPanels` MUST be a subset of the transitive ancestors
-    of its `writesPanel` in this DAG. Cross-DAG reads and cycles are
-    rejected at Pack registration.
+    Bridge (sequential, engine-driven; not a DAG edge):
+    ```
+    SourceBlackboard --[ quiescence ]--> SourceFreeze
+                     --[ TargetController start ]-->  Target KSs
+    ```
+
+    Target Blackboard (engine-fixed):
+    ```
+    Definition  ->  Archetype  ->  Statement       (BOTTOM_UP)
+    Statement   --[ TOP_DOWN ]-->   Definition.Verdict
+    ```
+
+    A BOTTOM_UP KS's `readsPanels` MUST be a subset of the transitive
+    ancestors of its `writesPanel` in the DAG of its target
+    Blackboard. A TOP_DOWN KS's `readsPanels` MAY include descendants
+    of `writesPanel` (sanctioned exception: `GranularityKS` reads
+    Statement, writes Definition). Cross-Blackboard reads from Target
+    KSs into Source panels are resolved via the `SourceFreezeView` --
+    no live cross-Blackboard reads.
   end note
+
+  ' ============================================================
+  ' BLACKBOARD (generic class) + AbstractionLayer
+  ' ============================================================
+
+  class Blackboard <<engine,record>> {
+    +id: String
+    +panels: Map<String, Panel>
+  }
+
+  note bottom of Blackboard
+    **Blackboard** -- Generic shared workspace; instantiated **twice**
+    per Run as `SourceBlackboard` and `TargetBlackboard`.
+
+    Both instances are records of THIS class; the difference is
+    *which* Panels they host:
+    - `SourceBlackboard` -- Pack-declared panels (Pack-namespaced names);
+      lifecycle: populated during Source phase, frozen at quiescence
+      into a `SourceFreeze` artefact, then quiescent for the rest of
+      the Run.
+    - `TargetBlackboard` -- engine-declared 3-panel spine
+      (Definition / Archetype / Statement); lifecycle: empty until
+      `SourceFreeze` is produced, then populated during Target phase.
+  end note
+
+  class AbstractionLayer <<engine,record>> {
+    +id: String
+    +rank: int
+    +description: String
+  }
+
+  note bottom of AbstractionLayer
+    **AbstractionLayer** -- Stratification metadata for panels.
+
+    Convention across both Blackboards: lower `rank` = less integrated
+    / more concrete; higher `rank` = more integrated / closer to
+    a usable answer. Layers DO NOT enforce data flow -- the panel DAG
+    (`Panel.dependsOnPanels`) remains operational truth.
+
+    Source side: each Pack declares its own `abstractionLayers[]` in
+    `pack-manifest.json`. Target side: engine ships a fixed 3-layer
+    enum (`TargetLayer` below) -- L_DEFINITION (rank 0), L_ARCHETYPE
+    (rank 1), L_STATEMENT (rank 2).
+  end note
+
+  Blackboard "1" *-- "1..*" Panel : hosts >
 
   ' ============================================================
   ' PANEL — single Java record (no hierarchy)
@@ -163,13 +275,15 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
 
   class Panel <<engine,record>> {
     +name: String
-    +kind: PanelKind
+    +blackboard: Blackboard
+    +abstractionLayer: String
     +slots: Map<String, ContributionSlot>
     +dependsOnPanels: List<String>
   }
 
   class ContributionSlot <<engine,record>> {
     +name: String
+    +panel: Panel
     +schemaUri: URI
     +defaultResolver: ContributionResolver
     +contributions: List<Contribution>
@@ -177,8 +291,70 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
 
   ' Composition: Panel is a composite of ContributionSlots,
   ' and each ContributionSlot owns its Contributions.
+  ' The composition arrows imply the inverse references
+  ' (ContributionSlot.panel and Contribution.slot).
   Panel "1" *-- "1..*" ContributionSlot : composes >
   ContributionSlot "1" *-- "0..*" Contribution : holds >
+
+  note bottom of ContributionSlot
+    **ContributionSlot** — Composite child of `Panel`; the typed bag
+    that owns Contributions of one slot within that Panel.
+
+    **Concept Semantics**:
+
+    - A ContributionSlot is the unit of *typing* AND *resolution* on
+      the Blackboard. Every `Contribution` belongs to exactly one
+      ContributionSlot (held in `contributions`); every Contribution's
+      `post` is validated against this slot's `schemaUri`; every
+      conflict among this slot's Contributions is folded by this
+      slot's `defaultResolver` (overridable per `(panel, slot)` via
+      RunConfig).
+    - The slot's *static shape* — `(name, panel, schemaUri,
+      defaultResolver)` — is fixed at Pack-registration time and
+      sealed for the Run. Its *runtime state* — the `contributions`
+      list — grows monotonically as KSs and the Initializer
+      post into it. The slot is the only legitimate write target on
+      the Blackboard; KSs never reach a Panel directly.
+    - The `panel` back-reference makes the slot self-describing
+      (a slot without its panel is meaningless: identity-key contract,
+      DAG position, and engine-vs-Pack ownership all live on the
+      Panel).
+
+    **Field Semantics**:
+
+    - `name`: slot name. Same string as the key under which this slot
+      is registered in `panel.slots`. Stable identifier used by
+      `Contribution`-wire envelopes (`Contribution.slot` field in
+      `panels/Contribution.schema.json`) and by KS descriptors
+      (`writesSlots[]`).
+    - `panel`: composite parent. Back-reference; the Panel
+      determines the hosting Blackboard (`SourceBlackboard` /
+      `TargetBlackboard`), DAG
+      position, identity-key contract, and engine-vs-Pack ownership.
+    - `schemaUri`: versioned `gsmarc://` URI of the JSON Schema bound
+      to this slot. Every `Contribution.post` posted into this slot
+      MUST satisfy it. Resolved as a JAR resource at
+      `/META-INF/gsmarc/<URI-tail>` (no network fetch).
+    - `defaultResolver`: the `ContributionResolver` strategy used to
+      fold competing Contributions held by this slot. RunConfig may
+      override per `(panel, slot)`.
+    - `contributions`: live list of `Contribution`s posted into this
+      slot during the current Run. Append-only during the Run;
+      cleared when the Run ends.
+
+    **Validation Rules (engine-enforced at registration / posting)**:
+
+    - `name` MUST be unique within `panel.slots`.
+    - `panel` MUST be the Panel under whose `slots` map this slot is
+      registered (composition consistency).
+    - `schemaUri` MUST resolve to a bundled JSON Schema (Draft
+      2020-12) at registration time.
+    - For every `c` in `contributions`: `c.slot == this`; `c.post`
+      MUST validate against `schemaUri`; if `panel.blackboard ==
+      TargetBlackboard`, the held Contributions MUST be
+      `TargetContribution` instances and each MUST carry a present
+      `targetIdentityKey`.
+  end note
 
   note bottom of Panel
     **Panel** — Typed region of the Blackboard, modelled as a
@@ -192,16 +368,18 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       `Contribution`s posted into it during a Run. The composition
       arrows on the diagram are normative: `Panel →*→ ContributionSlot
       →*→ Contribution`.
-    - The `(name, kind, dependsOnPanels)` triple plus the slot-map
-      shape (slot names + each slot's `schemaUri` and
-      `defaultResolver`) is the panel's static **registration**
-      metadata. The `contributions` list inside each slot is the
-      panel's **runtime** state, populated as a Run progresses.
-    - Both engine-owned (target) and Pack-owned (source) panels are
+    - The `(name, blackboard, abstractionLayer, dependsOnPanels)`
+      tuple plus the slot-map shape (slot names + each slot's
+      `schemaUri` and `defaultResolver`) is the panel's static
+      **registration** metadata. The `contributions` list inside each
+      slot is the panel's **runtime** state, populated as a Run
+      progresses.
+    - Both engine-owned (Target) and Pack-owned (Source) panels are
       instances of THIS record. The engine ships no panel base class
-      and no per-panel subclass. Differentiation is by `kind`
-      (SOURCE_ANALYSIS vs TARGET_DEFINITION) as data; ownership
-      (engine vs Pack) is derived from `kind`.
+      and no per-panel subclass. Differentiation is by which
+      Blackboard instance hosts the panel (the `blackboard`
+      back-reference); ownership (engine vs Pack) is derived from
+      that instance.
     - The slot map is CLOSED at Pack-registration time. One slot =
       one entry in `slots`; one Contribution belongs to exactly one
       `(panel, slot)` pair and is held in that slot's
@@ -213,21 +391,28 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     **Field Semantics**:
 
     - `name`: panel name. MUST be Pack-namespaced when
-      `kind = SOURCE_ANALYSIS` (e.g. `itip:SourceUnit`); engine-owned
-      target panels use unqualified GSM-spine names (Definition,
-      Archetype, Statement, Granularity, Evidence, Confidence).
-    - `kind`: SOURCE_ANALYSIS or TARGET_DEFINITION. Determines the
-      identity-key contract (target panels REQUIRE
-      `targetIdentityKey` on every Contribution; source panels MAY
-      omit it), the DAG-bridging contract (only source panels may
-      bridge to a target panel), and engine-vs-Pack ownership
-      (TARGET_DEFINITION ⇒ engine-owned and sealed;
-      SOURCE_ANALYSIS ⇒ Pack-owned).
+      `blackboard == SourceBlackboard` (e.g. `itip:SourceUnit`);
+      Target Blackboard panels use unqualified GSM-spine names
+      `Definition`, `Archetype`, `Statement` (the three engine-fixed
+      Target panels after Wave 9).
+    - `blackboard`: composite parent. Back-reference to the hosting
+      Blackboard instance (`SourceBlackboard` or `TargetBlackboard`).
+      Determines engine-vs-Pack ownership, identity-key contract
+      (Target panels REQUIRE `targetIdentityKey` on every
+      Contribution; Source panels MAY omit it), the layer registry
+      to validate `abstractionLayer` against (Pack-declared for
+      Source, engine-fixed `TargetLayer` enum for Target), and the
+      DAG context within which `dependsOnPanels` is resolved.
+    - `abstractionLayer`: id of the layer this panel belongs to.
+      Source panels: MUST be one of the Pack's declared
+      `abstractionLayers[]` ids. Target panels: MUST be one of
+      `TargetLayer` (`L_DEFINITION` / `L_ARCHETYPE` / `L_STATEMENT`).
+      Informational only -- not enforced as a data-flow constraint.
     - `slots`: closed map binding each accepted slot name to a
       `ContributionSlot` (a composite child of this Panel) carrying:
       - `name`: the slot's name (same as the map key).
       - `schemaUri`: versioned `gsmarc://` URI of the JSON Schema
-        that every `Contribution.value` posted into this slot MUST
+        that every `Contribution.post` posted into this slot MUST
         satisfy.
       - `defaultResolver`: the `ContributionResolver` strategy used
         to fold competing Contributions held by THIS slot. RunConfig
@@ -239,28 +424,32 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       `pack-manifest.extendsPanels[]`. Schema URIs resolve to
       resources bundled in the engine or Pack JAR at
       `/META-INF/gsmarc/<URI-tail>`.
-    - `dependsOnPanels`: panel-DAG edges. Engine-owned panel names
-      are allowed for upward bridges from source to target.
+    - `dependsOnPanels`: panel-DAG edges within THIS panel's
+      Blackboard instance. Cross-Blackboard edges are NOT permitted;
+      cross-Blackboard data flow is mediated by the `SourceFreeze`
+      bridge (Target KSs read frozen Source state via
+      `controlContext.sourceFreeze()`).
 
     **Validation Rules (engine-enforced at registration)**:
 
-    - `name` MUST be unique within a Run.
-    - `kind = SOURCE_ANALYSIS` ⇒ `name` MUST be Pack-namespaced.
-    - `kind = TARGET_DEFINITION` ⇒ panel MUST be declared by the
-      engine itself (Pack manifests cannot declare TARGET_DEFINITION
-      panels in `panels[]`; only additive slot entries
-      are allowed via `extendsPanels[]`).
-    - `dependsOnPanels` MUST NOT introduce a cycle in the DAG.
-    - A bridging edge (source ⇒ target) is permitted only when the
-      source panel has `kind = SOURCE_ANALYSIS` and the target panel
-      has `kind = TARGET_DEFINITION`.
+    - `name` MUST be unique within `blackboard.panels`.
+    - `blackboard == SourceBlackboard` ⇒ `name` MUST be
+      Pack-namespaced AND `abstractionLayer` MUST be one of the
+      Pack's declared `abstractionLayers[]` ids.
+    - `blackboard == TargetBlackboard` ⇒ panel MUST be one of the
+      three engine-reserved Target panels (`Definition`, `Archetype`,
+      `Statement`) AND `abstractionLayer` MUST be the corresponding
+      `TargetLayer` value (Pack manifests cannot declare new Target
+      panels in `panels[]`; only additive slot entries are allowed
+      via `extendsPanels[]`).
+    - `dependsOnPanels` MUST NOT introduce a cycle in the DAG of
+      `blackboard`.
     - A Contribution accepted into this Panel MUST carry a
       `slot` that is a key in `slots`; the
-      Contribution's `value` MUST validate against the bound schema.
-    - A Contribution with `determinism = NON_DETERMINISTIC` MUST
-      carry `cacheKey` (I-4).
-    - A Contribution with `kind = USER_OVERRIDE` MUST carry
-      `checkpointId` (I-11).
+      Contribution's `post` MUST validate against the bound schema.
+    - A Contribution produced by a KS whose descriptor declares
+      `determinismDefault = NON_DETERMINISTIC` MUST carry `cacheKey`
+      (I-4).
 
     **Derivation Rules**:
 
@@ -276,14 +465,16 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     Sourcing Blackboard skill)
 
     Provenance tag legend:
-      [HSII]  inherited directly from the canonical Hearsay-II /
-              Blackboard pattern
+      [BB]    inherited directly from the canonical Blackboard pattern
+              (data-integration variants such as TRICERO, CRYSALIS, GBB
+              -- Hearsay-II is the historical reference but not
+              the only one; GSM Sourcer is closer to the
+              data-integration variants because Source-side input is
+              deterministic, not signal-uncertain)
       [GSM-S] GSM Sourcer engineering choice (NOT canonical); kept
               honest so the design tradeoff stays visible
-      [OVL]   GSM Sourcer governance overlay (Checkpoint / Override
-              Cascader); has no counterpart in the canonical pattern
 
-    - **P-1 [HSII] Producer/consumer separation**: a new Panel is
+    - **P-1 [BB] Producer/consumer separation**: a new Panel is
       justified IFF at least one consumer reads this typed region
       while WRITING somewhere else. The consumer MAY be another KS
       OR an engine stage (e.g. the Validation/Registration
@@ -291,7 +482,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       consumer exists distinct from the producer KS(s), the
       candidate region is a slot of an existing panel,
       not a new panel.
-    - **P-2 [HSII] Distinct DAG node**: a new Panel MUST occupy a
+    - **P-2 [BB] Distinct DAG node**: a new Panel MUST occupy a
       distinct node in the panel DAG. If the candidate would have
       the same `dependsOnPanels` set AND the same downstream
       readers as an existing panel, it is a slot of
@@ -307,14 +498,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       override key `resolvers."<Panel>.<Slot>"`. P-3 no
       longer constrains panel-vs-type decisions. Retained as a
       named ID for traceability; effectively a no-op rule.
-    - **P-4 [OVL] Override cascade boundary**: a USER_OVERRIDE on
-      any slot of a panel cascades to the panel's
-      DAG-downstream consumers under one common cascade rule (per
-      I-11). This is a GSM Sourcer governance-overlay rule with no
-      Hearsay-II counterpart. Consequence: if the candidate aspect
-      must cascade differently than the rest of the panel, it MUST
-      be its own panel.
-    - **P-5 [HSII] Independent fillability**: slots of
+    - **P-5 [BB] Independent fillability**: slots of
       the same panel MUST be fillable by independent KSs in any
       order. If two aspects MUST be co-asserted by the same KS in
       one Contribution (a transactional invariant), they are the
@@ -334,16 +518,16 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       catches it.)
   end note
 
-  enum PanelKind {
-    SOURCE_ANALYSIS
-    TARGET_DEFINITION
+  enum TargetLayer {
+    L_DEFINITION
+    L_ARCHETYPE
+    L_STATEMENT
   }
 
   enum ContributionResolver {
     highestConfidence
     firstWriter
     failOnConflict
-    userMediated
     collectAll
     compose
   }
@@ -359,7 +543,7 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
     NORM
   }
 
-  enum GranularityVerdict {
+  enum DefinitionVerdict {
     keep
     drop
     splitInto
@@ -367,23 +551,27 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
   }
 
   ' ============================================================
-  ' PANEL ONTOLOGY — engine-owned target spine (instances of Panel)
+  ' TARGET BLACKBOARD ONTOLOGY — engine-owned 3-layer spine
   ' ============================================================
 
-  package "Panel ontology — engine-owned target spine\n(instances of Panel)" as TGT {
+  package "TargetBlackboard ontology — engine-owned 3-layer spine\n(instances of Panel; hosted on TargetBlackboard)" as TGT {
 
     object "Definition : Panel" as DefinitionPanel {
       name = "Definition"
-      kind = TARGET_DEFINITION
+      blackboard = TargetBlackboard
+      abstractionLayer = L_DEFINITION
       slots[Claim].schemaUri = gsmarc://gsm-sourcer/panels/Definition/Claim/v1
       slots[Claim].defaultResolver = highestConfidence
       slots[Merge].schemaUri = gsmarc://gsm-sourcer/panels/Definition/Merge/v1
       slots[Merge].defaultResolver = collectAll
+      slots[Verdict].schemaUri = gsmarc://gsm-sourcer/panels/Definition/Verdict/v1
+      slots[Verdict].defaultResolver = highestConfidence
       dependsOnPanels = []
     }
 
     note bottom of DefinitionPanel
-      **Definition** — Identity-binding panel of the GSM spine.
+      **Definition** — Identity-binding panel of the GSM spine
+      (TargetLayer L_DEFINITION).
 
       **Concept Semantics**:
 
@@ -391,65 +579,81 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
         subject (Structure, Mechanism, Effector, Receptor,
         Interaction, Archetype, Directive, Norm). Join key for every
         downstream target panel.
-      - Two slots (closed):
+      - Three slots (closed):
         - `Claim` — an `IdentificationKS` asserts an identity for a
-          subject based on source-panel evidence. `value` carries
+          subject based on SourceFreeze evidence. `post` carries
           `subjectKind` (DefinitionSubjectKind), `identityKey`
           (mints the join key), and `supportingSourceIds`.
         - `Merge` — a `ReconciliationKS` asserts that two prior
-          identities describe the same subject. `value` carries
+          identities describe the same subject. `post` carries
           `supersedesIdentityKeys` (non-empty) and a surviving
-          `targetIdentityKey`.
-      - Default resolvers (per slot): `Claim` →
-        `highestConfidence`, `Merge` → `collectAll`. Equally-
-        confident
-        `Claim`s on the same surface key escalate to a Checkpoint via
-        a `failOnConflict` / `userMediated` RunConfig override.
+          `targetIdentityKey`. Identity-time merging (pre-Statement),
+          based on Source signals only.
+        - `Verdict` — a `GranularityKS` (TOP_DOWN: reads Statement,
+          writes here) posts one consolidation verdict per identity.
+          `post.verdict` is one of `keep`, `drop`, `splitInto`,
+          `mergeWith` (see `DefinitionVerdict` enum). `mergeWith`
+          carries `targetIdentityKeys[0]` as the survivor;
+          `splitInto` carries the new identities to spawn.
+      - Default resolvers (per slot): `Claim` ->
+        `highestConfidence`, `Merge` -> `collectAll`, `Verdict` ->
+        `highestConfidence`. Equally-confident `Claim`s on the same
+        surface key remain side-by-side in `slot.contributions`
+        (resolver picks the highest; ties are broken deterministically
+        by `(timestamp, id)`).
 
       **Validation Rules**:
 
-      - `Claim.value.identityKey` is the engine's join key for
+      - `Claim.post.identityKey` is the engine's join key for
         downstream panels; required.
-      - `Merge.value.supersedesIdentityKeys[]` MUST resolve to prior
+      - `Merge.post.supersedesIdentityKeys[]` MUST resolve to prior
         `Claim` Contributions on the Blackboard.
+      - `Verdict.mergeWith` => `targetIdentityKeys` MUST resolve to a
+        Definition on the Blackboard. `Verdict.splitInto` =>
+        `targetIdentityKeys[]` non-empty; each new identity yields a
+        fresh Definition + downstream-target re-fire.
 
-      **Merge precedence rule (Definition.Merge vs Granularity.mergeWith)**:
+      **Merge precedence rule (Definition.Merge vs Definition.Verdict.mergeWith)**:
 
       - `Definition.Merge` is identity-time merging (pre-Statement),
-        based on source-side signals only.
-      - `Granularity.mergeWith` is post-statement consolidation,
-        informed by the populated Statement.
-      - When both apply to the same identity, `Granularity.mergeWith`
-        wins (more informed). The Override Cascader supersedes the
-        earlier `Definition.Merge` and re-fires downstream triggers
-        per I-11 cascade scope.
+        based on Source signals only.
+      - `Definition.Verdict.mergeWith` is post-statement consolidation,
+        informed by the populated Statement (the GranularityKS reads
+        Statement to decide).
+      - When both apply to the same identity, `Verdict.mergeWith`
+        wins (more informed). The Pipeline's Validation stage uses
+        the resolved Verdict for the registered Ascription;
+        downstream KSs that re-trigger on a Verdict change recompute
+        against the surviving identity.
     end note
 
     object "Archetype : Panel" as ArchetypePanel {
       name = "Archetype"
-      kind = TARGET_DEFINITION
+      blackboard = TargetBlackboard
+      abstractionLayer = L_ARCHETYPE
       slots[Application].schemaUri = gsmarc://gsm-sourcer/panels/Archetype/Application/v1
       slots[Application].defaultResolver = collectAll
       dependsOnPanels = [Definition]
     }
 
     note bottom of ArchetypePanel
-      **Archetype** — Archetype-application panel of the GSM spine.
+      **Archetype** — Archetype-application panel of the GSM spine
+      (TargetLayer L_ARCHETYPE).
 
       **Concept Semantics**:
 
       - Captures which GSM Archetype(s) apply to a given Definition.
         One slot (closed):
         - `Application` — an `ArchetypeKS` posts one archetype
-          reference per Contribution. `value` carries `archetypeRef`
+          reference per Contribution. `post` carries `archetypeRef`
           (versioned `gsmarc://` URI of the GSM Archetype Definition).
-      - Default resolver (`Application`): `collectAll` (union over Applications). The
-        Pipeline reads the union as the resolved archetype set for
-        the Definition.
+      - Default resolver (`Application`): `collectAll` (union over
+        Applications). The Pipeline reads the union as the resolved
+        archetype set for the Definition.
 
       **Validation Rules**:
 
-      - `Application.value.archetypeRef` MUST resolve to a registered
+      - `Application.post.archetypeRef` MUST resolve to a registered
         Archetype.
       - The asserted Archetype's structural-base (allOf chain) MUST
         be compatible with the resolved
@@ -458,156 +662,71 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
 
     object "Statement : Panel" as StatementPanel {
       name = "Statement"
-      kind = TARGET_DEFINITION
+      blackboard = TargetBlackboard
+      abstractionLayer = L_STATEMENT
       slots[Draft].schemaUri = gsmarc://gsm-sourcer/panels/Statement/Draft/v1
       slots[Draft].defaultResolver = compose
       dependsOnPanels = [Archetype]
     }
 
     note bottom of StatementPanel
-      **Statement** — Statement-shaping panel of the GSM spine.
+      **Statement** — Statement-shaping panel of the GSM spine
+      (TargetLayer L_STATEMENT, the most integrated layer).
 
       **Concept Semantics**:
 
       - Holds populated GSM statement payloads conforming to the
-        resolved Archetype's JSON Schema. One slot
-        (closed):
+        resolved Archetype's JSON Schema. One slot (closed):
         - `Draft` — a `StatementShapingKS` posts a partial or full
-          statement payload. `value` carries `statement` (the
+          statement payload. `post` carries `statement` (the
           archetype-typed payload), `completeness` (`partial` |
           `full`), and `shapingMethod` (free-form classifier such as
-          `structural-extraction`, `llm-completion`).
-      - Default resolver (`Draft`): `compose`. Multiple StatementShapingKSs may
-        post Contributions populating disjoint archetype fields; the
-        engine's schema-driven per-key merge assembles the union into
-        the resolved Statement. This is the panel-level realisation
-        of cooperative shaping.
+          `structural-extraction`, `llm-completion`,
+          `confidence-synthesis`).
+      - Default resolver (`Draft`): `compose`. Multiple
+        StatementShapingKSs may post Contributions populating disjoint
+        archetype fields; the engine's schema-driven per-key merge
+        assembles the union into the resolved Statement. This is the
+        panel-level realisation of cooperative shaping.
+      - Wave 9 collapse: a `ConfidenceSynthesisKS` is just another
+        StatementShapingKS variant that reads
+        `contributionsOf(Statement, identity)` (and their attached
+        `Contribution.evidence` arrays), computes a synthesised
+        confidence, and posts a refined Statement Contribution whose
+        `confidence` value carries the synthesis result. The `compose`
+        resolver folds it into the resolved view.
 
       **Validation Rules**:
 
-      - `Draft.value.statement` MUST validate against the resolved
+      - `Draft.post.statement` MUST validate against the resolved
         Archetype schema for the targeted Definition (incremental
         schema check at post time).
-      - LLM-driven Contributions MUST carry `determinism =
-        NON_DETERMINISTIC` and a `cacheKey` (I-4).
+      - LLM-driven KSs (those with `determinismDefault =
+        NON_DETERMINISTIC` in their descriptor) produce
+        Contributions that MUST carry a `cacheKey` (I-4).
       - The Pipeline's Validation stage rejects compositions that
         remain `partial` after resolution.
-    end note
-
-    object "Granularity : Panel" as GranularityPanel {
-      name = "Granularity"
-      kind = TARGET_DEFINITION
-      slots[Verdict].schemaUri = gsmarc://gsm-sourcer/panels/Granularity/Verdict/v1
-      slots[Verdict].defaultResolver = highestConfidence
-      dependsOnPanels = [Statement]
-    }
-
-    note bottom of GranularityPanel
-      **Granularity** — Post-statement consolidation panel of the
-      GSM spine.
-
-      **Concept Semantics**:
-
-      - Holds per-Definition consolidation verdicts AFTER Statement
-        shaping. One slot (closed):
-        - `Verdict` — a `GranularityKS` posts one verdict per
-          identity. `value.verdict` is one of `keep`, `drop`,
-          `splitInto`, `mergeWith` (see `GranularityVerdict` enum).
-          `mergeWith` carries `mergeWithIdentityKey`; `splitInto`
-          carries non-empty `splitIntoIdentityKeys[]`.
-      - Distinct from `Definition.Merge`: Granularity runs AFTER
-        Statement shaping, so its `mergeWith` verdict is informed by
-        the populated GSM statement and TAKES PRECEDENCE over any
-        earlier identity-time `Definition.Merge` for the same
-        identity (Override Cascader supersedes the earlier `Merge`).
-
-      **Validation Rules**:
-
-      - `mergeWith` ⇒ `mergeWithIdentityKey` MUST resolve to a
-        Definition on the Blackboard.
-      - `splitInto` ⇒ `splitIntoIdentityKeys[]` non-empty; each new
-        identity yields a fresh Definition + downstream-target
-        re-fire.
-    end note
-
-    object "Evidence : Panel" as EvidencePanel {
-      name = "Evidence"
-      kind = TARGET_DEFINITION
-      slots[Signal].schemaUri = gsmarc://gsm-sourcer/panels/Evidence/Signal/v1
-      slots[Signal].defaultResolver = collectAll
-      dependsOnPanels = [Statement]
-    }
-
-    note bottom of EvidencePanel
-      **Evidence** — Confidence-feeding panel of the GSM spine.
-
-      **Concept Semantics**:
-
-      - Aggregates positive or negative signals about a Definition's
-        Statement and surrounding context. One slot
-        (closed):
-        - `Signal` — an `EvidenceCollectionKS` posts one weighted
-          signal per Contribution. `value.weight ∈ [-1, 1]`;
-          `value.evidenceKind` is a free-form classifier
-          (`test-pass`, `test-fail`, `interface-coherence`,
-          `relation-density`, ...). Additive — every Signal counts.
-      - Default resolver (`Signal`): `collectAll`. The resolved view is the
-        full list of Signals; `ConfidenceSynthesisKS` reads the list
-        via `BlackboardView.contributionsOf(...)` (NOT `resolved`)
-        to compute a Confidence Score.
-    end note
-
-    object "Confidence : Panel" as ConfidencePanel {
-      name = "Confidence"
-      kind = TARGET_DEFINITION
-      slots[Score].schemaUri = gsmarc://gsm-sourcer/panels/Confidence/Score/v1
-      slots[Score].defaultResolver = highestConfidence
-      dependsOnPanels = [Evidence]
-    }
-
-    note bottom of ConfidencePanel
-      **Confidence** — Confidence-synthesis panel of the GSM spine.
-
-      **Concept Semantics**:
-
-      - Holds the synthesised confidence score per Definition (and
-        optionally per downstream target panel: Definition,
-        Archetype, Statement, Granularity). One slot
-        (closed):
-        - `Score` — a `ConfidenceSynthesisKS` posts one Score
-          Contribution per identity. `value.score ∈ [0, 1]`;
-          `value.targetPanel` ∈ {Definition, Archetype, Statement,
-          Granularity}.
-      - Default resolver (`Score`): `highestConfidence`. The Pipeline's
-        Validation stage MAY require a minimum Score per identity
-        before producing a `ValidatedAscriptionDraft`.
-      - `BlackboardView` exposes a Java accessor
-        `confidenceBelow(identity, threshold)` so a KS's
-        `triggerPredicate` can express revision triggers — a low
-        Score can re-fire upstream KSs even when their nominal
-        upstream contribution is already resolved.
-
-      **Validation Rules**:
-
-      - `targetPanel` MUST resolve to a registered engine-owned
-        target panel other than `Evidence` and other than
-        `Confidence` itself.
     end note
   }
 
   ' ============================================================
-  ' SOURCE PANELS — Pack-owned (placeholder)
+  ' SOURCE BLACKBOARD ONTOLOGY — Pack-owned (placeholder)
   ' ============================================================
 
-  package "Panel ontology — Pack-owned source side\n(instances of Panel; declared by Packs)" as SRC {
+  package "SourceBlackboard ontology — Pack-owned, layered\n(instances of Panel; hosted on SourceBlackboard;\nstratified by Pack-declared abstractionLayers)" as SRC {
 
     note as SrcPlaceholder
       **Source-side panel instances live in Pack manifests.**
 
-      The engine ships zero source panels. Each Sourcing Pack
-      declares its source panels as `Panel` instances in
-      `pack-manifest.panels[]`, with `kind = SOURCE_ANALYSIS`
-      and a Pack-namespaced `name`.
+      The engine ships zero Source panels. Each Sourcing Pack declares
+      its Source panels as `Panel` instances in
+      `pack-manifest.panels[]`, with `blackboard = SourceBlackboard`
+      and a Pack-namespaced `name`. Each Pack also declares its own
+      `abstractionLayers[]` (`{id, rank, description}` records); each
+      Source panel cites one of those layer ids in its
+      `abstractionLayer` field. Layers are informational stratification
+      metadata (visualization, reasoning); the panel DAG remains
+      operational truth.
 
       For the Repository Sourcing Pack, see:
       `itip/def/repository-sourcing-pack/repository-sourcing-pack.puml`
@@ -618,91 +737,230 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
       - `itip:SourceRelation`
       - `itip:SourceInterface`
 
-      Their bridging edges into `Definition` are shown in the Pack
-      diagram, not here.
+      Their bridging into the Target Blackboard is no longer a panel
+      DAG edge (Wave 9): cross-Blackboard reads are mediated by the
+      `SourceFreeze` artefact produced at Source-phase quiescence.
+      Target-phase `IdentificationKS` reads SourceFreeze via
+      `controlContext.sourceFreeze()` to mint Definition.Claim
+      Contributions.
     end note
   }
+
+  ' ============================================================
+  ' SOURCE FREEZE (sequential bridge artefact)
+  ' ============================================================
+
+  class SourceFreeze <<engine,artifact,immutable>> {
+    +freezeId: String
+    +runId: String
+    +frozenAt: Instant
+    +sourcePackUris: List<URI>
+    +abstractionLayers: List<AbstractionLayer>
+    +panels: Map<String, FrozenPanel>
+  }
+
+  note bottom of SourceFreeze
+    **SourceFreeze** -- Immutable snapshot of `SourceBlackboard` at
+    Source-phase quiescence; the **sequential bridge** between the
+    two Blackboards.
+
+    **Lifecycle**:
+
+    1. SourceController runs Source-phase KSs against
+       `SourceBlackboard` until quiescence (or
+       `runInvariants.completionPredicate` /
+       `runInvariants.maxIterations`).
+    2. Engine produces a `SourceFreeze` (deep-immutable: every Panel,
+       slot, and Contribution copied by value; the Pack-declared
+       `abstractionLayers` snapshotted alongside).
+    3. SourceController shuts down. TargetController starts.
+    4. Target-phase KSs read frozen Source state via
+       `controlContext.sourceFreeze()` (returns a `SourceFreezeView`).
+       They CANNOT post back to `SourceBlackboard`.
+
+    Distinct from `SourcingRunContext`: SourcingRunContext carries
+    Run input (operator intent, scope, focus, profile,
+    granularityPolicy, resolver overrides, runInvariants); the
+    SourceFreeze carries the Source phase's *output* (resolved Source
+    contributions per panel/slot/identity, with their evidence
+    payloads).
+
+    **Validation Rules**:
+
+    - Produced exactly once per Run, after Source quiescence and
+      before TargetController activation.
+    - Immutable: any attempt to mutate after publication is a
+      programming error.
+    - `panels` keys are exactly the Pack-declared Source panel names
+      that participated in the Run.
+  end note
+
+  ' ============================================================
+  ' EVIDENCE REF (value object on Contribution.evidence[])
+  ' ============================================================
+
+  class EvidenceRef <<engine,value>> {
+    +source: String
+    +kind: String
+    +weight: double
+    +note: String
+  }
+
+  note bottom of EvidenceRef
+    **EvidenceRef** -- Value object attached to a Contribution's
+    `evidence: List<EvidenceRef>` array; replaces the Wave 9-dropped
+    `Evidence` panel.
+
+    Any KS that wants to attach evidence to a Contribution it posts
+    populates this list directly. Downstream KSs reading the
+    Contribution (via `BlackboardView.contributionsOf(...)` or via
+    `SourceFreezeView`) inspect the `evidence` array. A
+    `ConfidenceSynthesisKS` reads attached evidence across
+    Statement Contributions for an identity, computes a synthesised
+    confidence, and posts a refined Statement Contribution whose
+    `confidence` value carries the synthesis result.
+
+    Fields:
+    - `source` (optional): provenance identifier (e.g. a Source
+      Contribution id, an external source uri, a tool result handle).
+    - `kind`: free-form classifier (`test-pass`, `test-fail`,
+      `interface-coherence`, `relation-density`, `static-analysis`,
+      `llm-rationale`, ...).
+    - `weight`: in `[-1, 1]`. Negative values are admissible
+      (counter-evidence).
+    - `note` (optional): short rationale.
+  end note
+
+  Contribution "1" *-- "0..*" EvidenceRef : evidence >
+
 
   ' ============================================================
   ' CONTRIBUTION (anchor type)
   ' ============================================================
 
-  class Contribution <<engine,record>> {
+  abstract class Contribution <<engine,record,abstract>> {
     +id: String
-    +panel: String
-    +slot: String
-    +value: JsonObject
-    +targetIdentityKey: String
+    +slot: ContributionSlot
+    +post: JsonObject
     +contributorKsId: URI
-    +kind: ContributionKind
-    +checkpointId: String
-    +determinism: Determinism
+    +confidence: double
+    +rationale: String
+    +evidence: List<EvidenceRef>
     +cacheKey: String
     +derivedFrom: List<String>
-    +supersedes: List<String>
-    +createdAt: Instant
+    +timestamp: Instant
   }
 
-  enum ContributionKind {
-    KS_DERIVED
-    INSTRUCTIONS_DERIVED
-    USER_OVERRIDE
+  class SourceContribution <<engine,record>> extends Contribution {
   }
 
-  enum Determinism {
-    DETERMINISTIC
-    NON_DETERMINISTIC
+  class TargetContribution <<engine,record>> extends Contribution {
+    +targetIdentityKey: String
   }
 
   note bottom of Contribution
-    **Contribution** — Atomic post on the Blackboard.
+    **Contribution** — Atomic post on the Blackboard. Held by exactly
+    one `ContributionSlot`.
 
     **Concept Semantics**:
 
     - The unit of work on the Blackboard. Posted by a Knowledge
-      Source (or by the Initializer for `INSTRUCTIONS_DERIVED`, or by
-      a Reviewer at a Checkpoint for `USER_OVERRIDE`).
-    - Belongs to exactly ONE `(panel, slot)` pair, where
-      `slot` is a key in the panel's `slots`
-      map. The Contribution is HELD in that slot's `contributions`
-      list (composition is the navigational truth); the `panel` and
-      `slot` fields here are wire identifiers / back-references used
-      for serialization, dispatch, and audit.
-    - The engine attaches `id`, `contributorKsId`, `kind`,
-      `derivedFrom`, `createdAt`, `supersedes`. KSs cannot fabricate
-      them.
-    - User overrides cascade via the Override Cascader: cascade scope
-      is the closure over `derivedFrom` UNION all downstream panels
-      for the same `targetIdentityKey` (I-11).
+      Source or by the Initializer (from the Pack's Instructions
+      Provider). The producer is always identified by
+      `contributorKsId` (a versioned `gsmarc://` URI); an
+      engine-reserved URI names the Initializer.
+    - Belongs to exactly ONE `ContributionSlot`. The `slot` field is
+      the typed back-reference to its composite parent; the slot in
+      turn knows its `panel`, so `(panel, slot)` is fully reachable
+      via `slot.panel.name + slot.name`. The JSON wire envelope in
+      `panels/Contribution.schema.json` carries `panel` and `slot`
+      as strings for serialization.
+    - **Immutable + append-only**: a Contribution is NEVER mutated in
+      place. To "change" a value, post a new Contribution; the old
+      one remains in `slot.contributions` for audit. Multiple KSs
+      MAY post into the same `(slot, targetIdentityKey)` — that is
+      exactly the competition the slot's resolver is designed to
+      fold.
+    - **Two concrete subtypes** distinguish source-side and
+      target-side semantics: `SourceContribution` (posted into a
+      panel hosted on `SourceBlackboard`) and `TargetContribution`
+      (posted into a panel hosted on `TargetBlackboard`; carries
+      the additional `targetIdentityKey`). All other fields are on
+      the abstract `Contribution`.
+    - The engine attaches `id`, `contributorKsId`, `derivedFrom`,
+      `timestamp`, and `cacheKey`. KSs cannot fabricate them.
 
-    **Field Semantics**:
+    **Property Semantics** (abstract `Contribution`):
 
-    - `kind`: provenance class — `KS_DERIVED` (default),
-      `INSTRUCTIONS_DERIVED` (Initializer-posted before Control
-      starts), `USER_OVERRIDE` (Reviewer-posted at a Checkpoint).
-    - `checkpointId`: required when `kind = USER_OVERRIDE`.
-    - `determinism`: `DETERMINISTIC` (structural extraction) or
-      `NON_DETERMINISTIC` (LLM-driven).
-    - `cacheKey`: required when `determinism = NON_DETERMINISTIC`
-      (I-4). Stable hash of `(KS id, KS version, all read inputs)`.
-    - `derivedFrom`: ids of Contributions read by the KS to produce
-      this one. Used by the Override Cascader.
-    - `supersedes`: ids this Contribution supersedes (engine-set).
+    - `id: String` — engine-set unique id. The only stable handle for
+      `derivedFrom` graphs and audit. Distinct from `cacheKey`
+      because it is minted *after* work completes; `cacheKey` is
+      computed *before* work starts so the engine can skip redundant
+      LLM calls.
+    - `slot: ContributionSlot` — typed back-reference to the
+      composite parent. Navigational truth for reaching the schema
+      (`slot.schemaUri`), the resolver (`slot.defaultResolver`), the
+      panel (`slot.panel`), and the sibling Contributions
+      (`slot.contributions`).
+    - `post: JsonObject` — the actual payload posted on the
+      Blackboard. MUST validate against `slot.schemaUri`. Everything
+      else on the record is metadata wrapping it.
+    - `contributorKsId: URI` — versioned `gsmarc://` URI of the
+      producer (KS or Pack Instructions Provider). Provenance,
+      audit, sandbox attribution, and KS-version-pinning input for
+      `cacheKey`. Engine-set; KSs cannot forge it. The provenance
+      class (KS / Initializer) is read from the URI prefix; no
+      separate `kind` field is kept.
+    - `confidence: double` — the producer's self-rated credibility
+      in this single post, in `[0, 1]`. MANDATORY (deterministic
+      structural posts conventionally set `1.0`). Used by the
+      `highestConfidence` resolver and by `ConfidenceSynthesisKS`,
+      which reads `contributionsOf(Statement, identity)` and posts
+      a refined `Statement.Draft` Contribution carrying the
+      synthesised cross-KS confidence (Wave 9: the dropped
+      `Confidence` panel is no longer needed — confidence rides on
+      every Contribution and is synthesised in place).
+    - `rationale: String` — optional free-text explanation. Surfaced
+      in audit trails. Empty by default.
+    - `cacheKey: String` — stable input fingerprint, set by the
+      engine when the producing KS is declared
+      `determinismDefault = NON_DETERMINISTIC` in its descriptor
+      (I-4). Computed as a hash of `(contributorKsId, all read
+      inputs)`; lets the engine memoise LLM calls across iterations
+      and Run replays. Null when the producing KS is deterministic.
+      Determinism is a property of the KS implementation, not of an
+      individual Contribution: two KSs writing into the same slot
+      may have opposite determinism, so the flag lives on the KS
+      descriptor (`KnowledgeSourceDescriptor.determinismDefault`),
+      not on the Contribution itself.
+    - `derivedFrom: List<String>` — ids of Contributions the
+      producer read to produce this one. Engine-set (the engine
+      instruments `BlackboardView` reads). Used for audit and
+      lineage reconstruction.
+    - `timestamp: Instant` — wall-clock posting time. Required by
+      the `firstWriter` resolver and by audit ordering. Engine-set.
+
+    **Property Semantics** (`TargetContribution` only):
+
+    - `targetIdentityKey: String` — identity key on the GSM target
+      spine. The slot's resolver folds Contributions per identity
+      key. Always present on `TargetContribution`; absent (by type)
+      on `SourceContribution`.
 
     **Validation Rules**:
 
-    - `(panel, slot)` MUST be a registered pair:
-      `slot` is a key in the named panel's
-      `slots` map; `value` MUST validate against the
-      JSON Schema bound to that key.
-    - `targetIdentityKey` is required when the named panel has
-      `kind = TARGET_DEFINITION` (target panels are
-      identity-keyed); MAY be omitted when
-      `kind = SOURCE_ANALYSIS`.
-    - `determinism = NON_DETERMINISTIC` ⇒ `cacheKey` MUST be present
-      (I-4).
-    - `kind = USER_OVERRIDE` ⇒ `checkpointId` MUST be present
-      (I-11).
+    - `slot` MUST be a registered `ContributionSlot` (i.e.
+      `slot == slot.panel.slots.get(slot.name)`).
+    - `post` MUST validate against `slot.schemaUri`.
+    - `slot.panel.blackboard == TargetBlackboard` ⇒ instance MUST be a
+      `TargetContribution` and `targetIdentityKey` MUST be present.
+    - `slot.panel.blackboard == SourceBlackboard` ⇒ instance MUST be a
+      `SourceContribution`.
+    - Producer determinism is read from
+      `KnowledgeSourceDescriptor.determinismDefault`;
+      `NON_DETERMINISTIC` ⇒ `cacheKey` MUST be present (I-4);
+      `DETERMINISTIC` ⇒ `cacheKey` MUST be null.
+    - `confidence` MUST be in `[0, 1]`.
   end note
 
   ' ============================================================
@@ -767,12 +1025,24 @@ frame "CD - GSM Sourcer - Blackboard panel topology" {
   ' Panel <-> Contribution
   Panel ..> Contribution : <<accepts>>
 
-  ' Target-side DAG (engine-owned panel instances)
+  ' Two Blackboard instances of the generic Blackboard class
+  Blackboard <|.. SourceBlackboard
+  Blackboard <|.. TargetBlackboard
+  SourceBlackboard ..> SrcPlaceholder : <<hosts>>
+  TargetBlackboard ..> DefinitionPanel : <<hosts>>
+  TargetBlackboard ..> ArchetypePanel : <<hosts>>
+  TargetBlackboard ..> StatementPanel : <<hosts>>
+
+  ' Target-side DAG (BOTTOM_UP)
   DefinitionPanel --> ArchetypePanel
   ArchetypePanel --> StatementPanel
-  StatementPanel --> GranularityPanel
-  StatementPanel --> EvidencePanel
-  EvidencePanel --> ConfidencePanel
+
+  ' Target-side TOP_DOWN edge: GranularityKS reads Statement, writes Definition.Verdict
+  StatementPanel ..> DefinitionPanel : <<TOP_DOWN\n(Definition.Verdict)>>
+
+  ' Sequential Source -> Target bridge via SourceFreeze
+  SourceBlackboard ..> SourceFreeze : <<frozen at\nquiescence>>
+  SourceFreeze ..> TargetBlackboard : <<read by\nTarget KSs>>
 
   ' Engine run state -> Blackboard (built BEFORE panels)
   SourcingRunContext ..> Panel : <<frozen before\nBlackboard Builder>>

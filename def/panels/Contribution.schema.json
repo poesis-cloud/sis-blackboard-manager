@@ -2,101 +2,97 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/Contribution/v1",
   "title": "Contribution",
-  "description": "Generic Blackboard contribution wrapper. Engine attaches id / contributorKsId / kind / derivedFrom / createdAt / supersedes. KSs cannot fabricate them.",
+  "description": "Generic Blackboard contribution wrapper. Two concrete shapes (SourceContribution, TargetContribution) distinguished by the host Blackboard instance: a TargetContribution (panel hosted on the Target Blackboard: Definition/Archetype/Statement) adds `targetIdentityKey`, a SourceContribution (panel hosted on the Source Blackboard: Pack-namespaced names) does not. Engine attaches id / contributorKsId / derivedFrom / timestamp / cacheKey. KSs cannot fabricate them. Contributions are immutable and append-only; a slot's `contributions` list is the run-time log within a Run. Wave 9: every Contribution MAY carry an optional `evidence` array of EvidenceRef entries (replaces the dropped Evidence panel); the per-Contribution `confidence` value (already mandatory) replaces the dropped Confidence panel for synthesis purposes (use `ConfidenceSynthesisKS` to post a refined Statement Contribution whose `confidence` reflects the synthesis).",
   "type": "object",
   "required": [
     "id",
     "panel",
     "slot",
-    "value",
+    "post",
     "contributorKsId",
-    "kind",
-    "determinism",
-    "createdAt"
+    "confidence",
+    "timestamp"
   ],
   "properties": {
     "id": {
-      "type": "string"
+      "type": "string",
+      "description": "Engine-set unique id. Stable handle for derivedFrom graphs and audit."
     },
     "panel": {
       "type": "string",
-      "enum": [
-        "SourceInventory",
-        "SourceUnit",
-        "SourceRelation",
-        "SourceInterface",
-        "Definition",
-        "Archetype",
-        "Statement",
-        "Granularity",
-        "Evidence",
-        "Confidence"
-      ]
+      "description": "Host panel name. Engine-owned Target Blackboard panels: `Definition`, `Archetype`, `Statement`. Source Blackboard panels: any Pack-namespaced name from a registered Pack manifest (e.g. `itip:SourceUnit`). The dropped Granularity/Evidence/Confidence panels (Wave 9 removal) are no longer accepted."
     },
     "slot": {
       "type": "string",
-      "description": "Contribution-type name within `panel` (one of the keys of the panel's closed `slots` map). Engine validates `value` against the JSON Schema bound to this key."
+      "description": "Slot name within `panel` (one of the keys of the panel's closed `slots` map). Engine validates `post` against the JSON Schema bound to this key."
     },
     "targetIdentityKey": {
       "type": [
         "string",
         "null"
       ],
-      "description": "Required for target-group panels (Archetype/Statement/Granularity/Evidence/Confidence) and for Definition Merge slots referencing prior identities. Null for source-group panels."
+      "description": "Required for TargetContribution (host panel on the Target Blackboard: Definition/Archetype/Statement). Null/absent for SourceContribution (host panel on the Source Blackboard: Pack-namespaced names)."
     },
-    "value": {
+    "post": {
       "type": "object",
-      "description": "Panel-specific value (validated against the JSON Schema bound to `slot` in the panel's slots map)."
+      "description": "Panel-specific payload posted on the Blackboard (validated against the JSON Schema bound to `slot` in the panel's slots map)."
     },
     "contributorKsId": {
       "type": "string",
-      "description": "Versioned gsmarc:// URI of the producing KS, of the Pack's Instructions Provider, or of the user-mediated override channel."
-    },
-    "kind": {
-      "type": "string",
-      "enum": [
-        "KS_DERIVED",
-        "INSTRUCTIONS_DERIVED",
-        "USER_OVERRIDE"
-      ],
-      "description": "Provenance class of the contribution. KS_DERIVED = posted by a KS via execve; INSTRUCTIONS_DERIVED = posted by the Initializer from the Instructions Provider's payload before Control starts; USER_OVERRIDE = posted by a Reviewer at a Checkpoint (requires checkpointId)."
-    },
-    "checkpointId": {
-      "type": "string",
-      "description": "Required when kind = USER_OVERRIDE. Identifies the suspended Checkpoint at which the Reviewer authored the override."
+      "description": "Versioned gsmarc:// URI of the producer (KS or Pack Instructions Provider). The provenance class is read from the URI prefix; a reserved engine URI identifies the Initializer (gsmarc://gsm-sourcer/initializer/v1)."
     },
     "confidence": {
       "type": "number",
       "minimum": 0,
-      "maximum": 1
+      "maximum": 1,
+      "description": "Producer's self-rated credibility for this single post, in [0, 1]. Mandatory; deterministic structural posts conventionally set 1.0. Read by the highestConfidence resolver and by ConfidenceSynthesisKS as input to a synthesised refined Contribution. Wave 9: the dropped `Confidence` panel previously held a per-identity synthesised score; that role is now played by the `confidence` value of a refined Statement Contribution posted by ConfidenceSynthesisKS and folded by the `compose` resolver on Statement.Draft."
     },
     "rationale": {
-      "type": "string"
-    },
-    "determinism": {
       "type": "string",
-      "enum": [
-        "DETERMINISTIC",
-        "NON_DETERMINISTIC"
-      ]
+      "description": "Optional free-text explanation. Surfaced in audit trails."
     },
     "cacheKey": {
       "type": "string",
-      "description": "Required when determinism = NON_DETERMINISTIC. Stable hash of (KS id, KS version, all read inputs)."
+      "description": "Required when the producing KS declares determinismDefault = NON_DETERMINISTIC in its descriptor (I-4). Stable hash of (contributorKsId, all read inputs); lets the engine memoise LLM calls across iterations and Run replays. Determinism is a property of the KS implementation (KnowledgeSourceDescriptor.determinismDefault), not of an individual Contribution."
     },
     "derivedFrom": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "description": "Ids of contributions read by the KS to produce this one."
+      "description": "Ids of Contributions the producer read to produce this one. Engine-set; used for audit and lineage reconstruction."
     },
-    "supersedes": {
+    "evidence": {
       "type": "array",
+      "description": "Optional list of EvidenceRef entries supporting (or contradicting) this Contribution's claim. Wave 9 replacement for the dropped `Evidence` panel: any KS that has evidence to attach MAY embed it here on the Contribution it posts. Read by ConfidenceSynthesisKS via `BlackboardView.contributionsOf(Statement, identity)` followed by `c.evidence()`.",
       "items": {
-        "type": "string"
-      },
-      "description": "Ids of contributions this one supersedes (engine-set)."
+        "type": "object",
+        "required": [
+          "kind",
+          "weight"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Optional gsmarc:// or other URI identifying the evidence's origin (e.g. a SourceFreeze reference, a test-result artefact, an LLM-trace id)."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Free-form classifier (e.g. `test-pass`, `test-fail`, `interface-coherence`, `relation-density`, `llm-self-rating`)."
+          },
+          "weight": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1,
+            "description": "Signed signal strength in [-1, 1]; negative weights are contradictory evidence."
+          },
+          "note": {
+            "type": "string",
+            "description": "Optional human-readable note."
+          }
+        },
+        "additionalProperties": false
+      }
     },
     "diagnostics": {
       "type": "array",
@@ -104,9 +100,10 @@
         "$ref": "../types/Diagnostic.schema.json"
       }
     },
-    "createdAt": {
+    "timestamp": {
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "description": "Wall-clock posting time. Required by the firstWriter resolver and by audit ordering. Engine-set."
     }
   },
   "additionalProperties": false,
@@ -114,31 +111,21 @@
     {
       "if": {
         "properties": {
-          "determinism": {
-            "const": "NON_DETERMINISTIC"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "cacheKey"
-        ]
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "kind": {
-            "const": "USER_OVERRIDE"
+          "panel": {
+            "enum": [
+              "Definition",
+              "Archetype",
+              "Statement"
+            ]
           }
         },
         "required": [
-          "kind"
+          "panel"
         ]
       },
       "then": {
         "required": [
-          "checkpointId"
+          "targetIdentityKey"
         ]
       }
     }

@@ -21,7 +21,7 @@ skinparam noteBorderColor #57606A
 frame "PD - GSM Sourcer - Component view" {
 
   package "API surface" as API_PKG {
-    component "Sourcer API\n(POST /runs, GET /runs/{id},\n /runs/{id}/blackboard,\n /runs/{id}/checkpoints/*)" as API
+    component "Sourcer API\n(POST /runs, GET /runs/{id},\n /runs/{id}/blackboard)" as API
   }
 
   package "Initialization" as INIT_PKG {
@@ -29,19 +29,21 @@ frame "PD - GSM Sourcer - Component view" {
     component "Plug-in Loader\n(sandboxed classloader per Pack)" as Loader
     component "Scope Builder\n(engine default; Pack may override)" as ScopeB
     component "Focus Builder\n(engine default; Pack may override)" as FocusB
-    component "Blackboard Builder\n(declares panels:\n  engine-owned target spine\n  + Pack-owned source-side\n    from pack-manifest;\n validates panel DAG;\n instantiates empty panels)" as BBBuild
+    component "Blackboard Builder\n(declares two Blackboards:\n  TargetBlackboard\n    (engine-fixed 3 panels:\n     Definition, Archetype, Statement)\n  SourceBlackboard\n    (Pack-owned panels +\n     Pack-declared abstractionLayers\n     from pack-manifest);\n validates each panel DAG;\n instantiates empty panels)" as BBBuild
   }
 
   package "Control" as CTRL_PKG {
-    component "Control\n(panel-DAG-aware scheduler;\nevaluates triggerPredicates over\nBlackboard state)" as Ctrl
-    component "ContributionResolver\n(per-panel: highestConfidence /\nfirstWriter / failOnConflict /\nuserMediated / collectAll)" as Res
-    component "Convergence Detector\n(quiescence: N empty iterations)" as Conv
-    component "Override Cascader\n(invalidate dependents on supersession)" as Casc
+    component "SourceController\n(panel-DAG-aware scheduler\nover SourceBlackboard;\nfires Source KSs to quiescence)" as SCtrl
+    component "TargetController\n(panel-DAG-aware scheduler\nover TargetBlackboard;\nstarts after SourceFreeze)" as TCtrl
+    component "Bridge\n(produces deep-immutable\nSourceFreeze on Source quiescence;\ntransfers control to TargetController)" as Bridge
+    component "ContributionResolver\n(per (panel, slot): highestConfidence /\nfirstWriter / failOnConflict /\ncollectAll / compose)" as Res
+    component "Convergence Detector\n(quiescence: N empty iterations;\nused independently per Controller)" as Conv
   }
 
-  package "Blackboard (in-memory + persisted)" as BB_PKG {
-    component "Source Panels\n(SourceInventory, SourceUnit,\nSourceRelation, SourceInterface)" as BB_SRC
-    component "Target Panels\n(Definition, Archetype, Statement,\nGranularity, Evidence, Confidence)" as BB_TGT
+  package "Blackboards (in-memory + persisted)" as BB_PKG {
+    component "SourceBlackboard\n(Pack-declared panels:\nSourceInventory, SourceUnit,\nSourceRelation, SourceInterface;\nPack-declared abstractionLayers)" as BB_SRC
+    component "TargetBlackboard\n(engine-fixed 3-panel spine:\nDefinition, Archetype, Statement;\nTargetLayer enum:\nL_DEFINITION, L_ARCHETYPE, L_STATEMENT)" as BB_TGT
+    component "SourceFreeze\n(deep-immutable snapshot of\nSourceBlackboard at quiescence;\nsequential bridge artefact)" as SF
   }
 
   package "Engine run state\n(distinct from the Blackboard)" as RC_PKG {
@@ -55,13 +57,9 @@ frame "PD - GSM Sourcer - Component view" {
     component "ValidatedAscriptionDraft\n+ RegisteredAscription records" as PipeRec
   }
 
-  package "Governance overlay" as CHK_PKG {
-    component "Checkpoint Mediator\n(A: post-convergence;\nB: post-validation)" as Chk
-  }
-
   package "Persistence & I/O" as PERS_PKG {
     component "BundleStore\n(SourceContextSnapshot,\nblackboard snapshots,\nbinary artefacts)" as BS
-    component "RunLedger\n(audit: per-iteration,\nresolver decisions,\ncheckpoint outcomes)" as RL
+    component "RunLedger\n(audit: per-iteration,\nresolver decisions)" as RL
   }
 
   package "Inference & DefMan exploration" as INF_PKG {
@@ -86,38 +84,50 @@ frame "PD - GSM Sourcer - Component view" {
   Init --> BBBuild : after RC freeze
   BBBuild --> BB_SRC : declare + instantiate
   BBBuild --> BB_TGT : declare + instantiate
-  Init --> Ctrl : start
+  Init --> SCtrl : start (Source phase)
   Init --> BS : initial snapshot
 
-  Ctrl --> BB_SRC
-  Ctrl --> BB_TGT
-  Ctrl --> Res
-  Ctrl --> Conv
-  Ctrl --> Casc
-  Ctrl --> RL
-  Ctrl --> Chk : Checkpoint-A
-  Ctrl --> Val : pass converged tuples
+  SCtrl --> BB_SRC
+  SCtrl --> Res : reconcile (Source side)
+  SCtrl --> Conv
+  SCtrl --> RL
+  SCtrl --> Bridge : on Source quiescence
+  Bridge --> SF : produce snapshot
+  Bridge --> TCtrl : start (Target phase)
+
+  TCtrl --> BB_TGT
+  TCtrl --> SF : read frozen Source
+  TCtrl --> Res : reconcile (Target side)
+  TCtrl --> Conv
+  TCtrl --> RL
+  TCtrl --> Val : pass converged tuples
   Val --> PipeRec
-  Val --> Chk : Checkpoint-B
-  Chk --> Reg : approved
+  Val --> Reg
   Reg --> DM
   Reg --> PipeRec
   Reg --> RL
 
-  ' KS execution (KSs themselves not shown; loaded by Loader and invoked by Ctrl)
-  Ctrl ..> Inf : KS-driven
-  Ctrl ..> DefExp : KS-driven
-  Ctrl ..> ExtT : KS-driven
+  ' KS execution (KSs themselves not shown; loaded by Loader and invoked by Controllers)
+  SCtrl ..> Inf : KS-driven
+  SCtrl ..> ExtT : KS-driven
+  TCtrl ..> Inf : KS-driven
+  TCtrl ..> DefExp : KS-driven
+  TCtrl ..> ExtT : KS-driven
   ExtT --> Sbx : enforced
 
   RCfg --> Init
-  RC --> Ctrl : runContext()
+  RC --> SCtrl : runContext()
+  RC --> TCtrl : runContext()
   RC --> Sbx : externalToolBindings\n(execve allowlist)
 
   note bottom of CTRL_PKG
-    Control is panel-graph-agnostic: it knows only the
-    declared panel DAG and KS triggerPredicates. It has
-    no semantic knowledge of any panel.
+    Two Controllers run **sequentially**: SourceController first
+    (to Source quiescence), then Bridge produces SourceFreeze, then
+    TargetController starts. Each Controller is panel-graph-agnostic:
+    it knows only the DAG of its Blackboard and KS triggerPredicates.
+    KS descriptors declare targetBlackboard = source|target so the
+    engine routes them to the right Controller; direction = TOP_DOWN
+    is a sanctioned exception used only by GranularityKS.
   end note
 
   note bottom of PIPE_PKG

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gsmarc://gsm-sourcer/panels/Definition/Merge/v1",
   "title": "DefinitionMergeValue",
-  "description": "Value of a Contribution posted onto the Definition panel with slot = Merge. A ReconciliationKS asserts that two or more prior Claim identityKeys describe the same GSM subject and should collapse onto one identity. This is identity-time merging, BEFORE Statement shaping. Granularity.Verdict (mergeWith) is post-statement consolidation; when both apply to the same identity, Granularity.Verdict wins because it is more informed (Override Cascader supersedes the earlier Definition.Merge).",
+  "description": "Value of a Contribution posted onto the Definition panel with slot = Merge. A ReconciliationKS asserts that two or more prior Claim identityKeys describe the same GSM subject and should collapse onto one identity. This is identity-time merging, BEFORE Statement shaping. Granularity.Verdict (mergeWith) is post-statement consolidation; when both apply to the same identity, Granularity.Verdict wins because it is more informed (the resolved Granularity verdict supersedes the earlier Definition.Merge).",
   "type": "object",
   "required": [
     "subjectKind",
