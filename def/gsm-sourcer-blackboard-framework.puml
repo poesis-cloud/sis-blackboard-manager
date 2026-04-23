@@ -561,6 +561,7 @@ frame "CD - GSM Sourcer - Blackboard Framework (generic Blackboard, Panel, Contr
     +runId: String
     +blackboard: Blackboard
     +resolvedAt: Instant
+    +sourcePackUris: List<URI>
     +panels: Map<String, FrozenPanel>
   }
 
