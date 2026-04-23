@@ -1,4 +1,4 @@
-@startuml gsm-sourcer-ks-contract
+@startuml gsm-sourcer-blackboard-framework-contracts
 
 ' ============================================================
 ' VISUAL THEME
@@ -21,7 +21,7 @@ skinparam packageBorderColor #57606A
 skinparam noteBackgroundColor #FFF8C5
 skinparam noteBorderColor #57606A
 
-frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
+frame "CD - GSM Sourcer - Blackboard Framework Contracts (engine-supplied interfaces and descriptors)" {
 
   interface KnowledgeSource {
     +List<Contribution> contribute(ControlContext ctx)
@@ -128,31 +128,155 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
     note : String?
   }
 
+  ' ============================================================
+  ' ENGINE-SUPPLIED SERVICE CONTRACTS
+  ' (all reachable from ControlContext; KSs depend on these)
+  ' ============================================================
+
+  interface KsTriggerPredicate <<plug-in,pure>> {
+    +boolean test(BlackboardView view, SourcingRunContext ctx)
+  }
+
+  note right of KsTriggerPredicate
+    Pack-supplied class. Pure read against the typed
+    `BlackboardView` and the frozen `SourcingRunContext`.
+    The Controller invokes `test(...)` once per scheduling tick
+    to decide whether the KS is firable. No DSL, no scripting.
+    See also note `N_TriggerPredicate` for the BlackboardView
+    accessor catalogue.
+  end note
+
+  interface CompletionPredicate <<plug-in,pure>> {
+    +boolean isComplete(BlackboardView view, SourcingRunContext ctx)
+  }
+
+  note right of CompletionPredicate
+    Optional Pack- or operator-supplied class. When set in
+    `RunConfig.runInvariants.completionPredicate`, the engine
+    polls it after each Controller iteration; a `true` return
+    forces the active phase to terminate even if quiescence has
+    not been reached. Loaded by FQN at Run start.
+  end note
+
+  interface ContributionResolver <<engine,strategy>> {
+    +Object resolve(List<Contribution> conflicting,\n                  ContributionSlot slot,\n                  SourcingRunContext ctx)
+  }
+
+  note right of ContributionResolver
+    Per-`(panel, slot)` strategy that folds competing
+    Contributions into a single resolved value visible via
+    `BlackboardView.resolved(panel, identityKey)`. Engine ships
+    five built-in strategies (selected by enum
+    `ContributionResolver` in
+    `gsm-sourcer-blackboard-framework.puml`):
+    `highestConfidence`, `firstWriter`, `failOnConflict`,
+    `collectAll`, `compose`. RunConfig may override per slot via
+    `resolvers."<Panel>.<Slot>"`. Pack code MUST NOT implement
+    custom resolvers; the closed strategy set is engine-owned.
+  end note
+
+  interface BundleStore <<engine,service>> {
+    +URI write(String pathHint, byte[] bytes)
+    +URI write(String pathHint, InputStream in)
+    +InputStream read(URI bundleUri)
+    +boolean exists(URI bundleUri)
+  }
+
+  note right of BundleStore
+    Run-scoped content-addressable store for materialised
+    artefacts (repository working copy, SBOM, tool outputs,
+    cached LLM responses). The Pack's Instructions Provider is
+    typically the only producer that needs `network = allow`;
+    KSs read deterministically from BundleStore (no live
+    network, enforcing I-13). Bundle URIs are stable for the
+    Run; lifecycle ends with the Run.
+  end note
+
+  interface InferenceService <<engine,service,non-deterministic>> {
+    +InferenceResponse complete(InferenceRequest req)
+    +InferenceResponse classify(ClassificationRequest req)
+  }
+
+  note right of InferenceService
+    Engine-mediated LLM/inference gateway. Available to KSs that
+    declare `inferenceServiceNeeded = true` in their descriptor.
+    The engine memoises calls by `cacheKey` (computed from
+    `(contributorKsId, all read inputs)`) so a NON_DETERMINISTIC
+    KS sees stable outputs across iterations and Run replays
+    (I-4). Engine-enforced budget: token / call counts are
+    debited from `KnowledgeSourceDescriptor.budget`.
+  end note
+
+  interface DefManExplorationService <<engine,service>> {
+    +List<ArchetypeRef> findArchetypes(SubjectKind kind)
+    +ArchetypeDefinition load(URI archetypeRef)
+    +Optional<URI> resolveSchema(URI archetypeRef)
+  }
+
+  note right of DefManExplorationService
+    Read-only window onto the Definition Manager's published
+    Archetype catalogue. Available to KSs that declare
+    `defmanExplorationNeeded = true` in their descriptor
+    (notably `ArchetypeMatchingKS`). NEVER mutates the Definition
+    Manager; mutation is the Pipeline's Registration stage's
+    responsibility, not a KS concern.
+  end note
+
+  interface Tool <<engine,service,sandboxed>> {
+    +String name()
+    +Path hostPath()
+    +ExecResult exec(List<String> args, ExecOptions opts)
+  }
+
+  note right of Tool
+    Sandboxed handle to one external host binary, obtained via
+    `ctx.tool(name)`. The engine returns a `Tool` only if BOTH
+    (a) the Pack declared `name` in
+    `pack-manifest.requestedExternalTools[]` AND
+    (b) the operator bound `name` in
+    `RunConfig.externalToolBindings[]` (3-layer authorization,
+    I-10). Sandbox `execve` allowlist is the third enforcement
+    layer. Output flows through `BundleStore`; stdout/stderr are
+    captured into `ExecResult`.
+  end note
+
+  interface DiagnosticReporter <<engine,service>> {
+    +void report(Diagnostic d)
+    +void warn(String code, String msg, JsonObject ctx)
+    +void error(String code, String msg, JsonObject ctx)
+  }
+
+  note right of DiagnosticReporter
+    Append-only Run-scoped diagnostic channel. KSs report
+    structured findings (validation failures, low-confidence
+    flags, ambiguity warnings, tool errors). Diagnostics are
+    surfaced in `BlackboardView` aggregates
+    (`view.validationFailed(identityKey)`) and in the Run audit
+    artefact persisted alongside `targetResolution`.
+  end note
+
+  ' ============================================================
+  ' RELATIONSHIPS
+  ' ============================================================
+
   KnowledgeSource --> KnowledgeSourceDescriptor : declared by
   KnowledgeSource --> ControlContext : uses (sole IO)
+  KnowledgeSource --> KsTriggerPredicate : declares (FQN)
+  KnowledgeSource --> Contribution : returns 0..n
   ControlContext --> BlackboardView
   ControlContext --> BlackboardResolutionView : (Target side only)
-  KnowledgeSource --> Contribution : returns 0..n
+  ControlContext --> BundleStore
+  ControlContext --> InferenceService : (if declared)
+  ControlContext --> DefManExplorationService : (if declared)
+  ControlContext --> Tool : (one per bound name)
+  ControlContext --> DiagnosticReporter
+  ContributionResolver ..> Contribution : folds N -> 1
   Contribution --> EvidenceRef : evidence
   InstructionsProvider --> InstructionsProviderDescriptor : declared by
+  InstructionsProvider --> BundleStore : materialises inputs
 
-  note as N_DSL
-    **triggerPredicate (Java; no DSL)**
-
-    Each KS supplies a Java class implementing the engine's
-    `KsTriggerPredicate` interface:
-
-      ```
-      interface KsTriggerPredicate {
-        boolean test(BlackboardView view,
-                     SourcingRunContext ctx);
-      }
-      ```
-
-    The Sourcer Controller invokes `test(...)` once per scheduling
-    tick to decide whether the KS is firable. Predicates are pure
-    reads against the typed `BlackboardView` and the frozen
-    `SourcingRunContext` — no string parsing, no scripting.
+  note as N_TriggerPredicate
+    **KsTriggerPredicate accessor catalogue**
 
     `BlackboardView` exposes the typed accessors a predicate needs:
 

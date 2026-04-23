@@ -1,0 +1,237 @@
+@startuml gsm-sourcer-blackboard-target-panels
+
+' ============================================================
+' VISUAL THEME
+' ============================================================
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 12
+skinparam ArrowColor #57606A
+skinparam DefaultFontName "SansSerif"
+skinparam backgroundColor #FFFFFF
+
+skinparam packageStyle rectangle
+skinparam packageBackgroundColor #F6F8FA
+skinparam packageBorderColor #57606A
+
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #57606A
+skinparam classFontColor #24292F
+
+skinparam objectBackgroundColor #FFFFFF
+skinparam objectBorderColor #57606A
+skinparam objectFontColor #24292F
+
+skinparam noteBackgroundColor #FFF8C5
+skinparam noteBorderColor #57606A
+
+frame "CD - GSM Sourcer - Target Blackboard Panels (engine-owned 3-panel GSM spine)" {
+
+  note as TargetSpineNote
+    **TargetBlackboard ontology -- engine-owned 3-panel GSM spine**
+
+    The Target Blackboard hosts a fixed three-panel spine:
+    `Definition` (identity claims), `Archetype` (classification),
+    `Statement` (fully populated body). Panel / ContributionSlot /
+    Contribution / Blackboard / BlackboardResolution generic
+    framework definitions live in
+    `gsm-sourcer-blackboard-framework.puml`; this diagram declares
+    the three engine-fixed `Panel` instances that populate the
+    Target Blackboard, their slot bindings, the intra-Target panel
+    DAG, and the sanctioned TOP_DOWN edge from `Statement` to
+    `Definition.Verdict` (GranularityKS).
+
+    Pack manifests cannot declare new Target panels in `panels[]`;
+    only additive Pack-namespaced slot entries on these three
+    panels are allowed via `extendsPanels[]`.
+  end note
+
+  ' ============================================================
+  ' TARGET-SPECIFIC ENUMS
+  ' ============================================================
+
+  enum DefinitionSubjectKind {
+    STRUCTURE
+    MECHANISM
+    EFFECTOR
+    RECEPTOR
+    INTERACTION
+    ARCHETYPE
+    DIRECTIVE
+    NORM
+  }
+
+  enum DefinitionVerdict {
+    keep
+    drop
+    splitInto
+    mergeWith
+  }
+
+  ' ============================================================
+  ' TARGET BLACKBOARD ONTOLOGY -- engine-owned 3-panel spine
+  ' ============================================================
+
+  package "TargetBlackboard ontology -- engine-owned 3-panel spine\n(instances of Panel; hosted on TargetBlackboard)" as TGT {
+
+    object "Definition : Panel" as DefinitionPanel {
+      name = "Definition"
+      blackboard = TargetBlackboard
+      slots[Claim].schemaUri = gsmarc://gsm-sourcer/panels/Definition/ClaimContribution/v1
+      slots[Claim].defaultResolver = highestConfidence
+      slots[Merge].schemaUri = gsmarc://gsm-sourcer/panels/Definition/MergeContribution/v1
+      slots[Merge].defaultResolver = collectAll
+      slots[Verdict].schemaUri = gsmarc://gsm-sourcer/panels/Definition/VerdictContribution/v1
+      slots[Verdict].defaultResolver = highestConfidence
+      dependencyPanels = []
+    }
+
+    note bottom of DefinitionPanel
+      **Definition** -- Identity-binding panel of the GSM spine.
+
+      **Concept Semantics**:
+
+      - Decides WHICH source items collectively define ONE GSM
+        subject (Structure, Mechanism, Effector, Receptor,
+        Interaction, Archetype, Directive, Norm). Join key for every
+        downstream target panel.
+      - Three slots (closed):
+        - `Claim` -- an `IdentificationKS` asserts an identity for a
+          subject based on BlackboardResolution evidence. `post` carries
+          `subjectKind` (DefinitionSubjectKind), `identityKey`
+          (mints the join key), and `supportingSourceIds`.
+        - `Merge` -- a `ReconciliationKS` asserts that two prior
+          identities describe the same subject. `post` carries
+          `supersedesIdentityKeys` (non-empty) and a surviving
+          `targetIdentityKey`. Identity-time merging (pre-Statement),
+          based on Source signals only.
+        - `Verdict` -- a `GranularityKS` (TOP_DOWN: reads Statement,
+          writes here) posts one consolidation verdict per identity.
+          `post.verdict` is one of `keep`, `drop`, `splitInto`,
+          `mergeWith` (see `DefinitionVerdict` enum). `mergeWith`
+          carries `targetIdentityKeys[0]` as the survivor;
+          `splitInto` carries the new identities to spawn.
+      - Default resolvers (per slot): `Claim` ->
+        `highestConfidence`, `Merge` -> `collectAll`, `Verdict` ->
+        `highestConfidence`. Equally-confident `Claim`s on the same
+        surface key remain side-by-side in `slot.contributions`
+        (resolver picks the highest; ties are broken deterministically
+        by `(timestamp, id)`).
+
+      **Validation Rules**:
+
+      - `Claim.post.identityKey` is the engine's join key for
+        downstream panels; required.
+      - `Merge.post.supersedesIdentityKeys[]` MUST resolve to prior
+        `Claim` Contributions on the Blackboard.
+      - `Verdict.mergeWith` => `targetIdentityKeys` MUST resolve to a
+        Definition on the Blackboard. `Verdict.splitInto` =>
+        `targetIdentityKeys[]` non-empty; each new identity yields a
+        fresh Definition + downstream-target re-fire.
+
+      **Merge precedence rule (Definition.Merge vs Definition.Verdict.mergeWith)**:
+
+      - `Definition.Merge` is identity-time merging (pre-Statement),
+        based on Source signals only.
+      - `Definition.Verdict.mergeWith` is post-statement consolidation,
+        informed by the populated Statement (the GranularityKS reads
+        Statement to decide).
+      - When both apply to the same identity, `Verdict.mergeWith`
+        wins (more informed). The Pipeline's Validation stage uses
+        the resolved Verdict for the registered Ascription;
+        downstream KSs that re-trigger on a Verdict change recompute
+        against the surviving identity.
+    end note
+
+    object "Archetype : Panel" as ArchetypePanel {
+      name = "Archetype"
+      blackboard = TargetBlackboard
+      slots[Application].schemaUri = gsmarc://gsm-sourcer/panels/Archetype/ApplicationContribution/v1
+      slots[Application].defaultResolver = collectAll
+      dependencyPanels = [Definition]
+    }
+
+    note bottom of ArchetypePanel
+      **Archetype** -- Archetype-application panel of the GSM spine.
+
+      **Concept Semantics**:
+
+      - Captures which GSM Archetype(s) apply to a given Definition.
+        One slot (closed):
+        - `Application` -- an `ArchetypeKS` posts one archetype
+          reference per Contribution. `post` carries `archetypeRef`
+          (versioned `gsmarc://` URI of the GSM Archetype Definition).
+      - Default resolver (`Application`): `collectAll` (union over
+        Applications). The Pipeline reads the union as the resolved
+        archetype set for the Definition.
+
+      **Validation Rules**:
+
+      - `Application.post.archetypeRef` MUST resolve to a registered
+        Archetype.
+      - The asserted Archetype's structural-base (allOf chain) MUST
+        be compatible with the resolved
+        `Definition.Claim.subjectKind` for the same identity.
+    end note
+
+    object "Statement : Panel" as StatementPanel {
+      name = "Statement"
+      blackboard = TargetBlackboard
+      slots[Draft].schemaUri = gsmarc://gsm-sourcer/panels/Statement/DraftContribution/v1
+      slots[Draft].defaultResolver = compose
+      dependencyPanels = [Archetype]
+    }
+
+    note bottom of StatementPanel
+      **Statement** -- Statement-shaping panel of the GSM spine
+      (the most integrated panel of the Target spine).
+
+      **Concept Semantics**:
+
+      - Holds populated GSM statement payloads conforming to the
+        resolved Archetype's JSON Schema. One slot (closed):
+        - `Draft` -- a `StatementShapingKS` posts a partial or full
+          statement payload. `post` carries `statement` (the
+          archetype-typed payload), `completeness` (`partial` |
+          `full`), and `shapingMethod` (free-form classifier such as
+          `structural-extraction`, `llm-completion`,
+          `confidence-synthesis`).
+      - Default resolver (`Draft`): `compose`. Multiple
+        StatementShapingKSs may post Contributions populating disjoint
+        archetype fields; the engine's schema-driven per-key merge
+        assembles the union into the resolved Statement. This is the
+        panel-level realisation of cooperative shaping.
+      - Wave 9 collapse: a `ConfidenceSynthesisKS` is just another
+        StatementShapingKS variant that reads
+        `contributionsOf(Statement, identity)` (and their attached
+        `Contribution.evidence` arrays), computes a synthesised
+        confidence, and posts a refined Statement Contribution whose
+        `confidence` value carries the synthesis result. The `compose`
+        resolver folds it into the resolved view.
+
+      **Validation Rules**:
+
+      - `Draft.post.statement` MUST validate against the resolved
+        Archetype schema for the targeted Definition (incremental
+        schema check at post time).
+      - LLM-driven KSs (those with `determinismDefault =
+        NON_DETERMINISTIC` in their descriptor) produce
+        Contributions that MUST carry a `cacheKey` (I-4).
+      - The Pipeline's Validation stage rejects compositions that
+        remain `partial` after resolution.
+    end note
+  }
+
+  ' ============================================================
+  ' RELATIONSHIPS
+  ' ============================================================
+
+  ' Target-side DAG (BOTTOM_UP)
+  DefinitionPanel --> ArchetypePanel
+  ArchetypePanel --> StatementPanel
+
+  ' Target-side TOP_DOWN edge: GranularityKS reads Statement, writes Definition.Verdict
+  StatementPanel ..> DefinitionPanel : <<TOP_DOWN\n(Definition.Verdict)>>
+}
+
+@enduml

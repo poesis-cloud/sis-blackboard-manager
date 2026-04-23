@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gsmarc://gsm-sourcer/panels/Archetype/Application/v1",
-  "title": "ArchetypeApplicationValue",
+  "$id": "gsmarc://gsm-sourcer/panels/Archetype/ApplicationContribution/v1",
+  "title": "ArchetypeApplicationContribution",
   "description": "Value of a Contribution posted onto the Archetype panel with slot = Application. One Archetype URI per contribution; the panel collects the union over all Application contributions for a given Definition (default ContributionResolver = collectAll).",
   "type": "object",
   "required": [
