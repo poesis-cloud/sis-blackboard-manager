@@ -77,11 +77,11 @@ frame "CD - GSM Sourcer - Target Blackboard Panels (engine-owned 3-panel GSM spi
     object "Definition : Panel" as DefinitionPanel {
       name = "Definition"
       blackboard = TargetBlackboard
-      slots[Claim].schemaUri = gsmarc://gsm-sourcer/panels/Definition/ClaimContribution/v1
+      slots[Claim].schemaUri = gsmarc://gsm-sourcer/contributions/Definition/ClaimContribution/v1
       slots[Claim].defaultResolver = highestConfidence
-      slots[Merge].schemaUri = gsmarc://gsm-sourcer/panels/Definition/MergeContribution/v1
+      slots[Merge].schemaUri = gsmarc://gsm-sourcer/contributions/Definition/MergeContribution/v1
       slots[Merge].defaultResolver = collectAll
-      slots[Verdict].schemaUri = gsmarc://gsm-sourcer/panels/Definition/VerdictContribution/v1
+      slots[Verdict].schemaUri = gsmarc://gsm-sourcer/contributions/Definition/VerdictContribution/v1
       slots[Verdict].defaultResolver = highestConfidence
       dependencyPanels = []
     }
@@ -146,7 +146,7 @@ frame "CD - GSM Sourcer - Target Blackboard Panels (engine-owned 3-panel GSM spi
     object "Archetype : Panel" as ArchetypePanel {
       name = "Archetype"
       blackboard = TargetBlackboard
-      slots[Application].schemaUri = gsmarc://gsm-sourcer/panels/Archetype/ApplicationContribution/v1
+      slots[Application].schemaUri = gsmarc://gsm-sourcer/contributions/Archetype/ApplicationContribution/v1
       slots[Application].defaultResolver = collectAll
       dependencyPanels = [Definition]
     }
@@ -177,7 +177,7 @@ frame "CD - GSM Sourcer - Target Blackboard Panels (engine-owned 3-panel GSM spi
     object "Statement : Panel" as StatementPanel {
       name = "Statement"
       blackboard = TargetBlackboard
-      slots[Draft].schemaUri = gsmarc://gsm-sourcer/panels/Statement/DraftContribution/v1
+      slots[Draft].schemaUri = gsmarc://gsm-sourcer/contributions/Statement/DraftContribution/v1
       slots[Draft].defaultResolver = compose
       dependencyPanels = [Archetype]
     }
