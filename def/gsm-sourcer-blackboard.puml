@@ -33,29 +33,39 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
 
   note as BlackboardNote
     **Two Blackboards (Source + Target) of one generic class, bridged
-    by a sequential SourceFreeze snapshot**
+    by a sequential BlackboardResolution snapshot**
 
     GSM Sourcer realises the Blackboard pattern as **two instances**
     of a single generic `Blackboard` class:
 
     - **`SourceBlackboard`** -- owned by the Sourcing Pack(s); hosts
-      the Pack-declared source-analysis panels, stratified by the
-      Pack's own declared **abstraction layers**.
+      the Pack-declared source-analysis panels.
     - **`TargetBlackboard`** -- owned by the engine; hosts the GSM
-      target spine as a **3-layer fixed stack**: `L_DEFINITION`
-      (identity claims), `L_ARCHETYPE` (classification), `L_STATEMENT`
+      target spine of three engine-fixed panels: `Definition`
+      (identity claims), `Archetype` (classification), `Statement`
       (fully populated body).
+
+    Both Blackboards undergo the same lifecycle: the engine produces
+    a `BlackboardResolution` artefact at quiescence, instantiated
+    twice per Run as `sourceResolution` (read by Target-phase KSs)
+    and `targetResolution` (consumed by the Pipeline and persisted
+    for audit). The two artefacts are records of the same generic
+    `BlackboardResolution` class.
 
     A single generic `Controller` class is also instantiated twice
     (`SourceController`, `TargetController`); each runs its own
     Activation -> Execution -> Conflict-Resolution loop until
     quiescence (or `runInvariants.completionPredicate` /
     `maxIterations`). The two phases run **sequentially**: Source
-    quiesces, the engine **freezes** the SourceBlackboard into an
-    immutable `SourceFreeze` artefact, then the TargetController
-    starts. Target-phase KSs read frozen Source state via
-    `controlContext.sourceFreeze()` (a `SourceFreezeView`); they
-    cannot post back to the Source Blackboard.
+    quiesces, the engine snapshots the SourceBlackboard into an
+    immutable `BlackboardResolution` (`sourceResolution`), then the
+    TargetController starts. Target-phase KSs read frozen Source
+    state via `controlContext.sourceResolution()` (a
+    `BlackboardResolutionView`); they cannot post back to the Source
+    Blackboard. After Target quiescence the engine produces a second
+    `BlackboardResolution` (`targetResolution`) consumed by the
+    Pipeline (Validation / Registration / Persistence) and persisted
+    for audit.
 
     The Controllers remain **panel-graph-agnostic in semantics** --
     they know only the declared panel DAG of their Blackboard
@@ -66,8 +76,8 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
     **One Java type for all panels.** A panel has no behaviour; it is
     metadata describing a typed region of one Blackboard. The engine
     therefore models every panel as one Java record
-    `Panel` with fields `(name, blackboard, abstractionLayer, slots,
-    dependsOnPanels)`, where `slots` maps each slot name to a
+    `Panel` with fields `(name, blackboard, description, slots,
+    dependencyPanels)`, where `slots` maps each slot name to a
     `ContributionSlot`. There is no class hierarchy, no abstract
     `SourceAnalysisPanel`, no abstract `TargetDefinitionPanel`, no
     per-panel concrete subclass. Differentiation is by which
@@ -85,36 +95,19 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
     abstract -- the engine's `PanelRegistry` accepts a `Panel` record
     regardless of who declared it, and enforces invariants at
     registration time (`blackboard = SourceBlackboard` ⇒ `name` MUST
-    be Pack-namespaced AND `abstractionLayer` MUST be one of the
-    Pack's declared layer ids; `blackboard = TargetBlackboard` ⇒
-    panel MUST be one of the engine's three reserved Definition /
-    Archetype / Statement panels; etc.).
+    be Pack-namespaced; `blackboard = TargetBlackboard` ⇒ panel MUST
+    be one of the engine's three reserved Definition / Archetype /
+    Statement panels; etc.).
 
     ====
 
-    **Abstraction layers (panel stratification metadata)**
+    **Panel stratification is emergent from the DAG**
 
-    Each panel declares an `abstractionLayer` id. Layers are
-    **informational stratification metadata** (visualization,
-    cross-Pack reasoning); they DO NOT enforce data flow -- the panel
-    DAG (`dependsOnPanels`) remains the operational truth. Convention
-    across both Blackboards: **lower rank = less integrated / more
-    concrete; higher rank = more integrated / closer to a usable
-    answer.**
-
-    - **Source side**: each Sourcing Pack declares its own
-      `abstractionLayers[]` in its manifest (`{id, rank, description}`
-      entries). Engine validates each Source panel's
-      `abstractionLayer` is one of the Pack's declared layer ids.
-      Recommended (NOT enforced) convention for software-repository
-      Packs: rank 0 `raw` (file tree, AST tokens), rank 1 `micro`
-      (functions, classes), rank 2 `meso` (modules, services), rank 3
-      `macro` (bounded contexts, capabilities), rank 4 `intent`
-      (responsibility, behavioural semantics).
-    - **Target side**: the engine ships a fixed 3-layer enum
-      `TargetLayer` = { `L_DEFINITION` (rank 0), `L_ARCHETYPE`
-      (rank 1), `L_STATEMENT` (rank 2) }. Pack `extendsPanels[]`
-      additive slots inherit the host panel's layer.
+    Panels carry no separate layer/rank metadata. Stratification is
+    emergent from `dependencyPanels` (the engine-validated DAG); a
+    panel's depth in that DAG is its de-facto integration level.
+    Panels MAY carry an optional `description` field for documentation
+    purposes only (no engine semantics).
 
     ====
 
@@ -182,10 +175,10 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
     confidence-1.0 hypothesis (a deliberate departure from
     Hearsay-II). It lives in `SourcingRunContext` -- a **frozen
     run-scoped engine value, distinct from the Blackboards** --
-    accessed via `controlContext.runContext()`. The `SourceFreeze`
+    accessed via `controlContext.runContext()`. The `BlackboardResolution`
     artefact (Source Blackboard's frozen state at quiescence) is
     *also* distinct from `SourcingRunContext` and is accessed via the
-    separate `controlContext.sourceFreeze()` accessor by Target-phase
+    separate `controlContext.sourceResolution()` accessor by Target-phase
     KSs.
 
     ====
@@ -204,7 +197,7 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
 
     Bridge (sequential, engine-driven; not a DAG edge):
     ```
-    SourceBlackboard --[ quiescence ]--> SourceFreeze
+    SourceBlackboard --[ quiescence ]--> BlackboardResolution
                      --[ TargetController start ]-->  Target KSs
     ```
 
@@ -219,12 +212,12 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
     Blackboard. A TOP_DOWN KS's `readsPanels` MAY include descendants
     of `writesPanel` (sanctioned exception: `GranularityKS` reads
     Statement, writes Definition). Cross-Blackboard reads from Target
-    KSs into Source panels are resolved via the `SourceFreezeView` --
+    KSs into Source panels are resolved via the `BlackboardResolutionView` --
     no live cross-Blackboard reads.
   end note
 
   ' ============================================================
-  ' BLACKBOARD (generic class) + AbstractionLayer
+  ' BLACKBOARD (generic class)
   ' ============================================================
 
   class Blackboard <<engine,record>> {
@@ -239,32 +232,14 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
     Both instances are records of THIS class; the difference is
     *which* Panels they host:
     - `SourceBlackboard` -- Pack-declared panels (Pack-namespaced names);
-      lifecycle: populated during Source phase, frozen at quiescence
-      into a `SourceFreeze` artefact, then quiescent for the rest of
-      the Run.
+      lifecycle: populated during Source phase, snapshotted at
+      quiescence into a `sourceResolution` artefact, then quiescent
+      for the rest of the Run.
     - `TargetBlackboard` -- engine-declared 3-panel spine
       (Definition / Archetype / Statement); lifecycle: empty until
-      `SourceFreeze` is produced, then populated during Target phase.
-  end note
-
-  class AbstractionLayer <<engine,record>> {
-    +id: String
-    +rank: int
-    +description: String
-  }
-
-  note bottom of AbstractionLayer
-    **AbstractionLayer** -- Stratification metadata for panels.
-
-    Convention across both Blackboards: lower `rank` = less integrated
-    / more concrete; higher `rank` = more integrated / closer to
-    a usable answer. Layers DO NOT enforce data flow -- the panel DAG
-    (`Panel.dependsOnPanels`) remains operational truth.
-
-    Source side: each Pack declares its own `abstractionLayers[]` in
-    `pack-manifest.json`. Target side: engine ships a fixed 3-layer
-    enum (`TargetLayer` below) -- L_DEFINITION (rank 0), L_ARCHETYPE
-    (rank 1), L_STATEMENT (rank 2).
+      `sourceResolution` is produced, then populated during Target
+      phase, then snapshotted at Target quiescence into a
+      `targetResolution` artefact consumed by the Pipeline.
   end note
 
   Blackboard "1" *-- "1..*" Panel : hosts >
@@ -276,9 +251,9 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
   class Panel <<engine,record>> {
     +name: String
     +blackboard: Blackboard
-    +abstractionLayer: String
+    +description: String
     +slots: Map<String, ContributionSlot>
-    +dependsOnPanels: List<String>
+    +dependencyPanels: List<String>
   }
 
   class ContributionSlot <<engine,record>> {
@@ -368,7 +343,7 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
       `Contribution`s posted into it during a Run. The composition
       arrows on the diagram are normative: `Panel →*→ ContributionSlot
       →*→ Contribution`.
-    - The `(name, blackboard, abstractionLayer, dependsOnPanels)`
+    - The `(name, blackboard, description, dependencyPanels)`
       tuple plus the slot-map shape (slot names + each slot's
       `schemaUri` and `defaultResolver`) is the panel's static
       **registration** metadata. The `contributions` list inside each
@@ -385,7 +360,7 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
       `(panel, slot)` pair and is held in that slot's
       `contributions` list.
     - The Panel knows its place in the engine-validated panel DAG
-      via `dependsOnPanels`. The DAG is validated for acyclicity and
+      via `dependencyPanels`. The DAG is validated for acyclicity and
       cross-DAG-read containment at Pack registration.
 
     **Field Semantics**:
@@ -399,15 +374,12 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
       Blackboard instance (`SourceBlackboard` or `TargetBlackboard`).
       Determines engine-vs-Pack ownership, identity-key contract
       (Target panels REQUIRE `targetIdentityKey` on every
-      Contribution; Source panels MAY omit it), the layer registry
-      to validate `abstractionLayer` against (Pack-declared for
-      Source, engine-fixed `TargetLayer` enum for Target), and the
-      DAG context within which `dependsOnPanels` is resolved.
-    - `abstractionLayer`: id of the layer this panel belongs to.
-      Source panels: MUST be one of the Pack's declared
-      `abstractionLayers[]` ids. Target panels: MUST be one of
-      `TargetLayer` (`L_DEFINITION` / `L_ARCHETYPE` / `L_STATEMENT`).
-      Informational only -- not enforced as a data-flow constraint.
+      Contribution; Source panels MAY omit it), and the DAG context
+      within which `dependencyPanels` is resolved.
+    - `description`: optional free-form documentation string. NOT
+      used by the engine; surfaced in audit and operator UIs only.
+      No layer/rank concept exists; stratification is emergent from
+      `dependencyPanels`.
     - `slots`: closed map binding each accepted slot name to a
       `ContributionSlot` (a composite child of this Panel) carrying:
       - `name`: the slot's name (same as the map key).
@@ -424,25 +396,23 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
       `pack-manifest.extendsPanels[]`. Schema URIs resolve to
       resources bundled in the engine or Pack JAR at
       `/META-INF/gsmarc/<URI-tail>`.
-    - `dependsOnPanels`: panel-DAG edges within THIS panel's
+    - `dependencyPanels`: panel-DAG edges within THIS panel's
       Blackboard instance. Cross-Blackboard edges are NOT permitted;
-      cross-Blackboard data flow is mediated by the `SourceFreeze`
+      cross-Blackboard data flow is mediated by the `BlackboardResolution`
       bridge (Target KSs read frozen Source state via
-      `controlContext.sourceFreeze()`).
+      `controlContext.sourceResolution()`).
 
     **Validation Rules (engine-enforced at registration)**:
 
     - `name` MUST be unique within `blackboard.panels`.
     - `blackboard == SourceBlackboard` ⇒ `name` MUST be
-      Pack-namespaced AND `abstractionLayer` MUST be one of the
-      Pack's declared `abstractionLayers[]` ids.
+      Pack-namespaced.
     - `blackboard == TargetBlackboard` ⇒ panel MUST be one of the
       three engine-reserved Target panels (`Definition`, `Archetype`,
-      `Statement`) AND `abstractionLayer` MUST be the corresponding
-      `TargetLayer` value (Pack manifests cannot declare new Target
-      panels in `panels[]`; only additive slot entries are allowed
-      via `extendsPanels[]`).
-    - `dependsOnPanels` MUST NOT introduce a cycle in the DAG of
+      `Statement`); Pack manifests cannot declare new Target panels
+      in `panels[]` (only additive slot entries are allowed via
+      `extendsPanels[]`).
+    - `dependencyPanels` MUST NOT introduce a cycle in the DAG of
       `blackboard`.
     - A Contribution accepted into this Panel MUST carry a
       `slot` that is a key in `slots`; the
@@ -484,7 +454,7 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
       not a new panel.
     - **P-2 [BB] Distinct DAG node**: a new Panel MUST occupy a
       distinct node in the panel DAG. If the candidate would have
-      the same `dependsOnPanels` set AND the same downstream
+      the same `dependencyPanels` set AND the same downstream
       readers as an existing panel, it is a slot of
       that panel.
     - **P-3 [GSM-S] Resolver granularity (DISSOLVED 2026-04)**:
@@ -517,12 +487,6 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
       also a P-3 violation; with P-3 dissolved, only P-1 still
       catches it.)
   end note
-
-  enum TargetLayer {
-    L_DEFINITION
-    L_ARCHETYPE
-    L_STATEMENT
-  }
 
   enum ContributionResolver {
     highestConfidence
@@ -559,19 +523,17 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
     object "Definition : Panel" as DefinitionPanel {
       name = "Definition"
       blackboard = TargetBlackboard
-      abstractionLayer = L_DEFINITION
       slots[Claim].schemaUri = gsmarc://gsm-sourcer/panels/Definition/Claim/v1
       slots[Claim].defaultResolver = highestConfidence
       slots[Merge].schemaUri = gsmarc://gsm-sourcer/panels/Definition/Merge/v1
       slots[Merge].defaultResolver = collectAll
       slots[Verdict].schemaUri = gsmarc://gsm-sourcer/panels/Definition/Verdict/v1
       slots[Verdict].defaultResolver = highestConfidence
-      dependsOnPanels = []
+      dependencyPanels = []
     }
 
     note bottom of DefinitionPanel
-      **Definition** — Identity-binding panel of the GSM spine
-      (TargetLayer L_DEFINITION).
+      **Definition** — Identity-binding panel of the GSM spine.
 
       **Concept Semantics**:
 
@@ -581,7 +543,7 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
         downstream target panel.
       - Three slots (closed):
         - `Claim` — an `IdentificationKS` asserts an identity for a
-          subject based on SourceFreeze evidence. `post` carries
+          subject based on BlackboardResolution evidence. `post` carries
           `subjectKind` (DefinitionSubjectKind), `identityKey`
           (mints the join key), and `supportingSourceIds`.
         - `Merge` — a `ReconciliationKS` asserts that two prior
@@ -630,15 +592,13 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
     object "Archetype : Panel" as ArchetypePanel {
       name = "Archetype"
       blackboard = TargetBlackboard
-      abstractionLayer = L_ARCHETYPE
       slots[Application].schemaUri = gsmarc://gsm-sourcer/panels/Archetype/Application/v1
       slots[Application].defaultResolver = collectAll
-      dependsOnPanels = [Definition]
+      dependencyPanels = [Definition]
     }
 
     note bottom of ArchetypePanel
-      **Archetype** — Archetype-application panel of the GSM spine
-      (TargetLayer L_ARCHETYPE).
+      **Archetype** — Archetype-application panel of the GSM spine.
 
       **Concept Semantics**:
 
@@ -663,15 +623,14 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
     object "Statement : Panel" as StatementPanel {
       name = "Statement"
       blackboard = TargetBlackboard
-      abstractionLayer = L_STATEMENT
       slots[Draft].schemaUri = gsmarc://gsm-sourcer/panels/Statement/Draft/v1
       slots[Draft].defaultResolver = compose
-      dependsOnPanels = [Archetype]
+      dependencyPanels = [Archetype]
     }
 
     note bottom of StatementPanel
       **Statement** — Statement-shaping panel of the GSM spine
-      (TargetLayer L_STATEMENT, the most integrated layer).
+      (the most integrated panel of the Target spine).
 
       **Concept Semantics**:
 
@@ -713,7 +672,7 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
   ' SOURCE BLACKBOARD ONTOLOGY — Pack-owned (placeholder)
   ' ============================================================
 
-  package "SourceBlackboard ontology — Pack-owned, layered\n(instances of Panel; hosted on SourceBlackboard;\nstratified by Pack-declared abstractionLayers)" as SRC {
+  package "SourceBlackboard ontology — Pack-owned\n(instances of Panel; hosted on SourceBlackboard;\nstratification emergent from dependencyPanels DAG)" as SRC {
 
     note as SrcPlaceholder
       **Source-side panel instances live in Pack manifests.**
@@ -721,12 +680,9 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
       The engine ships zero Source panels. Each Sourcing Pack declares
       its Source panels as `Panel` instances in
       `pack-manifest.panels[]`, with `blackboard = SourceBlackboard`
-      and a Pack-namespaced `name`. Each Pack also declares its own
-      `abstractionLayers[]` (`{id, rank, description}` records); each
-      Source panel cites one of those layer ids in its
-      `abstractionLayer` field. Layers are informational stratification
-      metadata (visualization, reasoning); the panel DAG remains
-      operational truth.
+      and a Pack-namespaced `name`. Stratification is emergent from
+      each panel's `dependencyPanels` (the engine-validated DAG); no
+      separate layer/rank concept exists.
 
       For the Repository Sourcing Pack, see:
       `itip/def/repository-sourcing-pack/repository-sourcing-pack.puml`
@@ -739,60 +695,72 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
 
       Their bridging into the Target Blackboard is no longer a panel
       DAG edge (Wave 9): cross-Blackboard reads are mediated by the
-      `SourceFreeze` artefact produced at Source-phase quiescence.
-      Target-phase `IdentificationKS` reads SourceFreeze via
-      `controlContext.sourceFreeze()` to mint Definition.Claim
+      `sourceResolution` artefact produced at Source-phase quiescence.
+      Target-phase `IdentificationKS` reads `sourceResolution` via
+      `controlContext.sourceResolution()` to mint Definition.Claim
       Contributions.
     end note
   }
 
   ' ============================================================
-  ' SOURCE FREEZE (sequential bridge artefact)
+  ' BLACKBOARD RESOLUTION (sequential bridge artefact;
+  ' instantiated symmetrically as sourceResolution + targetResolution)
   ' ============================================================
 
-  class SourceFreeze <<engine,artifact,immutable>> {
-    +freezeId: String
+  class BlackboardResolution <<engine,artifact,immutable>> {
+    +resolutionId: String
     +runId: String
-    +frozenAt: Instant
-    +sourcePackUris: List<URI>
-    +abstractionLayers: List<AbstractionLayer>
+    +blackboard: Blackboard
+    +resolvedAt: Instant
     +panels: Map<String, FrozenPanel>
   }
 
-  note bottom of SourceFreeze
-    **SourceFreeze** -- Immutable snapshot of `SourceBlackboard` at
-    Source-phase quiescence; the **sequential bridge** between the
-    two Blackboards.
+  note bottom of BlackboardResolution
+    **BlackboardResolution** -- Immutable snapshot of a `Blackboard`
+    at phase quiescence. Instantiated **twice** per Run: once as
+    `sourceResolution` (snapshot of `SourceBlackboard`, read by
+    Target-phase KSs) and once as `targetResolution` (snapshot of
+    `TargetBlackboard`, consumed by the Pipeline and persisted for
+    audit). Both instances are records of THIS class; the difference
+    is the `blackboard` back-reference.
 
-    **Lifecycle**:
+    **Lifecycle** (symmetric per phase):
 
-    1. SourceController runs Source-phase KSs against
-       `SourceBlackboard` until quiescence (or
+    1. The phase Controller (Source or Target) runs its KSs against
+       the corresponding Blackboard until quiescence (or
        `runInvariants.completionPredicate` /
        `runInvariants.maxIterations`).
-    2. Engine produces a `SourceFreeze` (deep-immutable: every Panel,
-       slot, and Contribution copied by value; the Pack-declared
-       `abstractionLayers` snapshotted alongside).
-    3. SourceController shuts down. TargetController starts.
-    4. Target-phase KSs read frozen Source state via
-       `controlContext.sourceFreeze()` (returns a `SourceFreezeView`).
-       They CANNOT post back to `SourceBlackboard`.
+    2. Engine produces a `BlackboardResolution` (deep-immutable:
+       every Panel, slot, and Contribution copied by value).
+    3. The phase Controller shuts down. The next stage starts:
+       - After Source quiescence: `sourceResolution` is published;
+         TargetController starts. Target-phase KSs read frozen Source
+         state via `controlContext.sourceResolution()` (returns a
+         `BlackboardResolutionView`). They CANNOT post back to
+         `SourceBlackboard`.
+       - After Target quiescence: `targetResolution` is published
+         and handed to the Pipeline (Validation / Registration /
+         Persistence) and persisted for audit.
 
     Distinct from `SourcingRunContext`: SourcingRunContext carries
     Run input (operator intent, scope, focus, profile,
-    granularityPolicy, resolver overrides, runInvariants); the
-    SourceFreeze carries the Source phase's *output* (resolved Source
+    granularityPolicy, resolver overrides, runInvariants); each
+    `BlackboardResolution` carries one phase's *output* (resolved
     contributions per panel/slot/identity, with their evidence
     payloads).
 
     **Validation Rules**:
 
-    - Produced exactly once per Run, after Source quiescence and
-      before TargetController activation.
+    - Produced exactly twice per Run (one `sourceResolution`, one
+      `targetResolution`), each after the corresponding phase's
+      quiescence.
     - Immutable: any attempt to mutate after publication is a
       programming error.
-    - `panels` keys are exactly the Pack-declared Source panel names
-      that participated in the Run.
+    - `panels` keys are exactly the panel names that participated in
+      the phase (Pack-declared for `sourceResolution`; engine-fixed
+      Definition / Archetype / Statement for `targetResolution`).
+    - `blackboard` MUST reference the Blackboard instance that was
+      snapshotted (consistent with `panels` keys).
   end note
 
   ' ============================================================
@@ -814,7 +782,7 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
     Any KS that wants to attach evidence to a Contribution it posts
     populates this list directly. Downstream KSs reading the
     Contribution (via `BlackboardView.contributionsOf(...)` or via
-    `SourceFreezeView`) inspect the `evidence` array. A
+    `BlackboardResolutionView`) inspect the `evidence` array. A
     `ConfidenceSynthesisKS` reads attached evidence across
     Statement Contributions for an identity, computes a synthesised
     confidence, and posts a refined Statement Contribution whose
@@ -1040,9 +1008,10 @@ frame "CD - GSM Sourcer - Blackboards (Source + Target) topology" {
   ' Target-side TOP_DOWN edge: GranularityKS reads Statement, writes Definition.Verdict
   StatementPanel ..> DefinitionPanel : <<TOP_DOWN\n(Definition.Verdict)>>
 
-  ' Sequential Source -> Target bridge via SourceFreeze
-  SourceBlackboard ..> SourceFreeze : <<frozen at\nquiescence>>
-  SourceFreeze ..> TargetBlackboard : <<read by\nTarget KSs>>
+  ' Sequential phase bridges via BlackboardResolution
+  SourceBlackboard ..> BlackboardResolution : <<sourceResolution\nat Source quiescence>>
+  BlackboardResolution ..> TargetBlackboard : <<read by\nTarget KSs>>
+  TargetBlackboard ..> BlackboardResolution : <<targetResolution\nat Target quiescence>>
 
   ' Engine run state -> Blackboard (built BEFORE panels)
   SourcingRunContext ..> Panel : <<frozen before\nBlackboard Builder>>

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gsmarc://gsm-sourcer/blackboard-resolution/v1",
+  "title": "BlackboardResolution",
+  "description": "Immutable snapshot of a Blackboard taken at phase quiescence. Instantiated TWICE per Run by the engine: once as `sourceResolution` (snapshot of `SourceBlackboard` at Source-phase quiescence; read by Target-phase KSs via `controlContext.sourceResolution()` returning a `BlackboardResolutionView`) and once as `targetResolution` (snapshot of `TargetBlackboard` at Target-phase quiescence; consumed by the Pipeline and persisted for audit). Both instances follow the same schema; the `blackboard` discriminator names which Blackboard was snapshotted. Persisted in `BundleStore` as a versioned artefact for replay (I-12).",
+  "type": "object",
+  "required": [
+    "resolutionId",
+    "runId",
+    "blackboard",
+    "resolvedAt",
+    "sourcePackUris",
+    "panels"
+  ],
+  "properties": {
+    "resolutionId": {
+      "type": "string",
+      "description": "Engine-set unique id for this resolution artefact."
+    },
+    "runId": {
+      "type": "string",
+      "description": "Run id this BlackboardResolution was produced by."
+    },
+    "blackboard": {
+      "type": "string",
+      "enum": ["SourceBlackboard", "TargetBlackboard"],
+      "description": "Discriminator: which Blackboard instance was snapshotted. `SourceBlackboard` for `sourceResolution`; `TargetBlackboard` for `targetResolution`."
+    },
+    "resolvedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Wall-clock time of the snapshot (set when the corresponding Controller declared quiescence)."
+    },
+    "sourcePackUris": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Versioned gsmarc:// URIs of the Sourcing Packs whose KSs and panels participated in the Run (echoed on both resolutions for self-describing replay)."
+    },
+    "panels": {
+      "type": "array",
+      "description": "Snapshot of the snapshotted Blackboard's panels. One entry per panel. The `slots` map carries the resolved values per identity AND the full underlying Contribution log (so a downstream consumer may call either `resolved(panel, key)` or `contributionsOf(panel, key)` against the BlackboardResolutionView, mirroring the live Blackboard accessors).",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "slots"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional free-form description echoed from the Panel record."
+          },
+          "slots": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "required": [
+                "schemaUri",
+                "contributions"
+              ],
+              "properties": {
+                "schemaUri": {
+                  "type": "string"
+                },
+                "contributions": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "panels/Contribution.schema.json"
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

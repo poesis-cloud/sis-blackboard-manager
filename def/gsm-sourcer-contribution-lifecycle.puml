@@ -71,7 +71,7 @@ state "Definition lifecycle" as DEF {
   [*] --> NotYetIdentified
 
   state "Identified\n(>= 1 Definition.Claim)" as Identified
-  NotYetIdentified --> Identified : IdentificationKS\nreads SourceFreeze\n+ posts Definition.Claim for identityKey K
+  NotYetIdentified --> Identified : IdentificationKS\nreads BlackboardResolution\n+ posts Definition.Claim for identityKey K
   Identified --> Identified : ReconciliationKS posts\nDefinition.Merge
 
   state "PanelsAccreting\n(Target panels gain Contributions:\nArchetype.Application / Statement.Draft;\nGranularityKS may post Definition.Verdict\n(TOP_DOWN); ConfidenceSynthesisKS may post\nrefined Statement.Draft with synthesised\nconfidence + evidence)" as PanelsAccreting

@@ -29,21 +29,21 @@ frame "PD - GSM Sourcer - Component view" {
     component "Plug-in Loader\n(sandboxed classloader per Pack)" as Loader
     component "Scope Builder\n(engine default; Pack may override)" as ScopeB
     component "Focus Builder\n(engine default; Pack may override)" as FocusB
-    component "Blackboard Builder\n(declares two Blackboards:\n  TargetBlackboard\n    (engine-fixed 3 panels:\n     Definition, Archetype, Statement)\n  SourceBlackboard\n    (Pack-owned panels +\n     Pack-declared abstractionLayers\n     from pack-manifest);\n validates each panel DAG;\n instantiates empty panels)" as BBBuild
+    component "Blackboard Builder\n(declares two Blackboards:\n  TargetBlackboard\n    (engine-fixed 3 panels:\n     Definition, Archetype, Statement)\n  SourceBlackboard\n    (Pack-owned panels\n     from pack-manifest);\n validates each panel DAG;\n instantiates empty panels)" as BBBuild
   }
 
   package "Control" as CTRL_PKG {
     component "SourceController\n(panel-DAG-aware scheduler\nover SourceBlackboard;\nfires Source KSs to quiescence)" as SCtrl
-    component "TargetController\n(panel-DAG-aware scheduler\nover TargetBlackboard;\nstarts after SourceFreeze)" as TCtrl
-    component "Bridge\n(produces deep-immutable\nSourceFreeze on Source quiescence;\ntransfers control to TargetController)" as Bridge
+    component "TargetController\n(panel-DAG-aware scheduler\nover TargetBlackboard;\nstarts after sourceResolution)" as TCtrl
+    component "Bridge\n(produces deep-immutable\nBlackboardResolution at each phase quiescence:\nsourceResolution, then targetResolution;\ntransfers control to next stage)" as Bridge
     component "ContributionResolver\n(per (panel, slot): highestConfidence /\nfirstWriter / failOnConflict /\ncollectAll / compose)" as Res
     component "Convergence Detector\n(quiescence: N empty iterations;\nused independently per Controller)" as Conv
   }
 
   package "Blackboards (in-memory + persisted)" as BB_PKG {
-    component "SourceBlackboard\n(Pack-declared panels:\nSourceInventory, SourceUnit,\nSourceRelation, SourceInterface;\nPack-declared abstractionLayers)" as BB_SRC
-    component "TargetBlackboard\n(engine-fixed 3-panel spine:\nDefinition, Archetype, Statement;\nTargetLayer enum:\nL_DEFINITION, L_ARCHETYPE, L_STATEMENT)" as BB_TGT
-    component "SourceFreeze\n(deep-immutable snapshot of\nSourceBlackboard at quiescence;\nsequential bridge artefact)" as SF
+    component "SourceBlackboard\n(Pack-declared panels:\nSourceInventory, SourceUnit,\nSourceRelation, SourceInterface)" as BB_SRC
+    component "TargetBlackboard\n(engine-fixed 3-panel spine:\nDefinition, Archetype, Statement)" as BB_TGT
+    component "BlackboardResolution\n(deep-immutable snapshot of a Blackboard\nat phase quiescence; instantiated as\nsourceResolution then targetResolution;\nsequential bridge artefact)" as SF
   }
 
   package "Engine run state\n(distinct from the Blackboard)" as RC_PKG {
@@ -100,6 +100,9 @@ frame "PD - GSM Sourcer - Component view" {
   TCtrl --> Res : reconcile (Target side)
   TCtrl --> Conv
   TCtrl --> RL
+  TCtrl --> Bridge : on Target quiescence
+  Bridge --> SF : produce targetResolution
+  Bridge --> Val : start Pipeline (consumes targetResolution)
   TCtrl --> Val : pass converged tuples
   Val --> PipeRec
   Val --> Reg
@@ -122,7 +125,7 @@ frame "PD - GSM Sourcer - Component view" {
 
   note bottom of CTRL_PKG
     Two Controllers run **sequentially**: SourceController first
-    (to Source quiescence), then Bridge produces SourceFreeze, then
+    (to Source quiescence), then Bridge produces sourceResolution, then
     TargetController starts. Each Controller is panel-graph-agnostic:
     it knows only the DAG of its Blackboard and KS triggerPredicates.
     KS descriptors declare targetBlackboard = source|target so the

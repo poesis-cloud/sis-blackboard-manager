@@ -38,7 +38,7 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
     direction : enum                 (BOTTOM_UP | TOP_DOWN; default BOTTOM_UP)
     writesPanel : String             (panel name; one; must belong to targetBlackboard)
     writesSlots : List<String>
-    readsPanels : List<String>       (BOTTOM_UP: subset of dependsOnPanels*
+    readsPanels : List<String>       (BOTTOM_UP: subset of dependencyPanels*
                                       TOP_DOWN: may include descendants;
                                       sanctioned only for GranularityKS)
     triggerPredicate : Class<? extends KsTriggerPredicate>
@@ -78,7 +78,7 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
   interface ControlContext <<runtime>> {
     +SourcingRunContext runContext()
     +BlackboardView blackboard()         (the Controller's targeted Blackboard)
-    +SourceFreezeView sourceFreeze()     (Target-side only; null on Source side)
+    +BlackboardResolutionView sourceResolution()     (Target-side only; null on Source side)
     +InferenceService inference()        (if declared)
     +DefManExplorationService defman()   (if declared)
     +Tool tool(String name)              (if declared + bound)
@@ -94,11 +94,10 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
     +void post(Contribution c)
   }
 
-  interface SourceFreezeView <<read-only,immutable>> {
+  interface BlackboardResolutionView <<read-only,immutable>> {
     +boolean has(String packPanelName, String identityKey)
     +List<Contribution> contributionsOf(String packPanelName, String identityKey)
     +List<Contribution> contributionsOfSlot(String packPanelName, String slot)
-    +List<AbstractionLayer> abstractionLayers()
   }
 
   class Contribution <<wire,abstract>> {
@@ -132,7 +131,7 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
   KnowledgeSource --> KnowledgeSourceDescriptor : declared by
   KnowledgeSource --> ControlContext : uses (sole IO)
   ControlContext --> BlackboardView
-  ControlContext --> SourceFreezeView : (Target side only)
+  ControlContext --> BlackboardResolutionView : (Target side only)
   KnowledgeSource --> Contribution : returns 0..n
   Contribution --> EvidenceRef : evidence
   InstructionsProvider --> InstructionsProviderDescriptor : declared by
@@ -165,8 +164,8 @@ frame "CD - GSM Sourcer - Plug-in contracts (KS + Instructions Provider)" {
       ctx.scope().includes(identityKey)
 
     Target-side only (read frozen Source):
-      ctx.sourceFreeze().has(packPanelName, identityKey)
-      ctx.sourceFreeze().contributionsOf(packPanelName, identityKey)
+      ctx.sourceResolution().has(packPanelName, identityKey)
+      ctx.sourceResolution().contributionsOf(packPanelName, identityKey)
 
     Revision (re-fire even when upstream is resolved):
       view.confidenceBelow(identityKey, threshold)

@@ -75,7 +75,7 @@ frame "UC - GSM Sourcer" {
     A Pack ships an Instructions Provider (Pack-typed
     payload), source-side panel declarations
     (name + per-slot value schemas +
-    dependsOnPanels), and KS descriptors. Pack also
+    dependencyPanels), and KS descriptors. Pack also
     declares requestedExternalTools[] (upper bound).
     All KSs are Java JARs; KSs are unaware of each other.
   end note

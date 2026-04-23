@@ -74,7 +74,7 @@
         "properties": {
           "source": {
             "type": "string",
-            "description": "Optional gsmarc:// or other URI identifying the evidence's origin (e.g. a SourceFreeze reference, a test-result artefact, an LLM-trace id)."
+            "description": "Optional gsmarc:// or other URI identifying the evidence's origin (e.g. a BlackboardResolution reference, a test-result artefact, an LLM-trace id)."
           },
           "kind": {
             "type": "string",

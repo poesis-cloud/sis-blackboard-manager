@@ -38,7 +38,7 @@
         "source",
         "target"
       ],
-      "description": "Which Blackboard instance this KS contributes to. `source` -> SourceBlackboard (Pack-owned panels); `target` -> TargetBlackboard (engine-owned panels Definition/Archetype/Statement). Source-Blackboard KSs run only during the Source phase (before SourceFreeze); Target-Blackboard KSs run only during the Target phase (after SourceFreeze) and access the frozen Source state via `controlContext.sourceFreeze()`."
+      "description": "Which Blackboard instance this KS contributes to. `source` -> SourceBlackboard (Pack-owned panels); `target` -> TargetBlackboard (engine-owned panels Definition/Archetype/Statement). Source-Blackboard KSs run only during the Source phase (before BlackboardResolution); Target-Blackboard KSs run only during the Target phase (after BlackboardResolution) and access the frozen Source state via `controlContext.sourceResolution()`."
     },
     "direction": {
       "type": "string",
@@ -65,7 +65,7 @@
       "items": {
         "type": "string"
       },
-      "description": "Panels this KS reads. For BOTTOM_UP KSs (default): MUST be a subset of `dependsOnPanels*` of `writesPanel` in the panel DAG of this KS's target Blackboard. For TOP_DOWN KSs: MAY include descendants of `writesPanel`. Target-Blackboard KSs MAY also list source-panel names; the engine resolves them via the `SourceFreezeView` for read access."
+      "description": "Panels this KS reads. For BOTTOM_UP KSs (default): MUST be a subset of `dependencyPanels*` of `writesPanel` in the panel DAG of this KS's target Blackboard. For TOP_DOWN KSs: MAY include descendants of `writesPanel`. Target-Blackboard KSs MAY also list source-panel names; the engine resolves them via the `BlackboardResolutionView` for read access."
     },
     "triggerPredicate": {
       "type": "string",

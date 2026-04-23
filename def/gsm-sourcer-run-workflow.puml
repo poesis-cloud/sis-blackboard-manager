@@ -33,7 +33,7 @@ participant "SourceController" as SCtrl
 participant "TargetController" as TCtrl
 participant "SourceBlackboard" as SBB
 participant "TargetBlackboard" as TBB
-participant "SourceFreeze\n(immutable bridge)" as SF
+participant "BlackboardResolution\n(immutable bridge)" as SF
 participant "Resolver" as Res
 participant "Sandboxed KSs" as KSs
 participant "External Tools\n(allowlisted)" as ExtT
@@ -58,7 +58,7 @@ group Initializer substeps
   Init -> SF : buildScope(profile) ; buildFocus(scope, runConfig)
   SF --> Init : scope, focus
   Init -> RC : freeze(SourcingRunContext)
-  Init -> SBB : Source Blackboard Builder\n(Pack panels + Pack abstractionLayers;\nvalidate Source DAG; instantiate)
+  Init -> SBB : Source Blackboard Builder\n(Pack panels;\nvalidate Source DAG; instantiate)
   Init -> TBB : Target Blackboard Builder\n(engine 3-panel spine:\nDefinition, Archetype, Statement;\nvalidate Target DAG; instantiate)
 end
 
@@ -88,9 +88,9 @@ loop until Source quiescence OR maxIterations OR completionPredicate
   Res -> SBB : update resolved view
 end
 
-== Sequential bridge: SourceFreeze ==
+== Sequential bridge: Source Resolution ==
 
-SCtrl -> SF : freeze(SourceBlackboard)\n  (deep-immutable snapshot:\n   panels, slots, contributions,\n   Pack-declared abstractionLayers)
+SCtrl -> SF : sourceResolution = snapshot(SourceBlackboard)\n  (deep-immutable snapshot:\n   panels, slots, contributions)
 SCtrl -> RL : record Source phase END
 SF --> TCtrl : start Target phase
 
@@ -104,7 +104,7 @@ loop until Target quiescence OR maxIterations OR completionPredicate
   TCtrl -> KSs : Execution: fire eligible Target KSs
 
   alt IdentificationKS fires
-    KSs -> SF : sourceFreeze.has(<Pack:SourceUnit>, identity)
+    KSs -> SF : sourceResolution.has(<Pack:SourceUnit>, identity)
     KSs -> RC : runContext().scope.includes(...)
     KSs -> TBB : post Contribution(panel=Definition, slot=Claim,\n  value={subjectKind, identityKey, supportingSourceIds})
   else ReconciliationKS fires
@@ -134,6 +134,11 @@ loop until Target quiescence OR maxIterations OR completionPredicate
   TCtrl -> Res : Conflict Resolution: reconcile per (panel, slot)
   Res -> TBB : update resolved view
 end
+
+== Sequential bridge: Target Resolution ==
+
+TCtrl -> SF : targetResolution = snapshot(TargetBlackboard)\n  (deep-immutable snapshot:\n   panels, slots, contributions)
+SF --> Pipe : start Pipeline (consumes targetResolution)
 
 == Pipeline: Validation (engine-only) ==
 
