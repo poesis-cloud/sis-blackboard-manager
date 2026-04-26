@@ -103,6 +103,7 @@ Auth scopes: `bb:write` (contributions), `bb:seal` (Blackboard seal),
 (everything else).
 
 Concurrency:
+
 - `If-Match` ETag CAS on panel declarations and seal calls.
 
 See [def/blackboard/schemas/](def/blackboard/schemas/) for the JSON schemas
@@ -146,6 +147,7 @@ OPEN ──POST seal──► SEALING ──success──► SEALED
 ```
 
 Why server-side:
+
 - Single arbiter for "are we done with this Blackboard".
 - The seal moment is the audit anchor for deterministic replay: it freezes
   the contribution set and gives the stream a byte-stable order.
@@ -182,6 +184,7 @@ Pattern:
    same query/audit surface as any other contribution.
 
 Why this is right:
+
 - Substrate stores **facts**, not **decisions**. A REST service shared across
   clients should not bake one specific control strategy.
 - The same sealed Bb can be reduced differently by different consumers
