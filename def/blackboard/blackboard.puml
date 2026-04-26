@@ -1,0 +1,290 @@
+@startuml blackboard
+
+' ============================================================
+' VISUAL THEME
+' ============================================================
+
+left to right direction
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 12
+skinparam ArrowColor #57606A
+skinparam DefaultFontName "SansSerif"
+skinparam backgroundColor #FFFFFF
+
+skinparam packageStyle rectangle
+skinparam packageBackgroundColor #F6F8FA
+skinparam packageBorderColor #57606A
+
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor #57606A
+skinparam classFontColor #24292F
+
+skinparam noteBackgroundColor #FFF8C5
+skinparam noteBorderColor #57606A
+
+frame "CD - Definition Blackboard Manager - Server-side data model" {
+
+  ' ============================================================
+  ' DBM NOTE
+  ' ============================================================
+
+  note as DbmNote
+    **DBM -- Definition Blackboard Manager (Server-side data model)**
+
+    Generic, domain-agnostic blackboard substrate. The single top-level
+    resource is `Blackboard`. The service is a **passive store of facts**:
+    it persists client-posted contributions, validates them per-slot, and
+    seals the contribution set. It does NOT reduce contributions.
+
+    Reduction is **controller-side** -- a client-owned process over the
+    byte-stable sealed contribution stream. See SKILL.md section 5.
+
+    All entities below are persisted server-side and exposed as REST
+    sub-resources of `Blackboard`. Client sourcers declare their domain
+    ontology entirely as data: panels and slot schemas. The service
+    holds no hardcoded domain concept, no resolver, no merge logic.
+
+    **Minimality**: this model is intentionally minimal; it will be
+    enriched only when concrete needs surface on the ITIP client side.
+
+    Lifecycle invariants enforced server-side:
+    - Panel topology is **frozen** when the first contribution is
+      accepted on the Blackboard.
+    - A Blackboard transitions through `OPEN -> SEALING -> SEALED`
+      exactly once; no further writes accepted after `SEALED`.
+    - The sealed contribution stream is **byte-stable**; this is the
+      audit anchor that client-side reducers replay against.
+  end note
+
+  ' ============================================================
+  ' BLACKBOARD
+  ' ============================================================
+
+  class Blackboard {
+    +getId(): URI
+    +getName(): String
+    +getTimestamp(): Instant
+    +getStatus(): BlackboardStatus
+    +getSealTimestamp(): Instant?
+    +getPanels(): Panel[]
+  }
+
+  note bottom of Blackboard
+    **Blackboard** -- top-level resource of the substrate.
+
+    **Concept Semantics**:
+
+    - A Blackboard is a self-standing, client-instantiated workspace into
+      which Knowledge Sources (client-side) post Contributions over REST.
+    - **Isolation**: each Blackboard is a fully isolated unit of work.
+      The service performs no cross-Blackboard sequencing, chaining, or
+      coupling, and exposes no inter-Blackboard relation. Any client
+      flow that happens to span multiple Blackboards is responsible for
+      its own bookkeeping out-of-band; the substrate has no knowledge
+      of it.
+    - The Blackboard owns its lifecycle: `OPEN -> SEALING -> SEALED`
+      (success) or `OPEN | SEALING -> ABORTED` (client abort or
+      irrecoverable failure). SEALED is terminal; the contribution
+      stream becomes byte-stable and the audit ledger is closed.
+
+    **Attribute Semantics**:
+
+    - `id`: server-minted resource identifier (URI). Immutable.
+    - `name`: client-supplied free-form label; not interpreted by the
+      service.
+    - `timestamp`: creation timestamp.
+    - `status`: lifecycle state (BlackboardStatus).
+    - `sealTimestamp`: set on transition to `SEALED`; null otherwise.
+    - `panels`: the panel set declared on this Blackboard.
+
+    **Validation Rules**:
+
+    - `id` MUST NOT be null.
+    - `name` is free-form; uniqueness is per server-minted `id`.
+    - `status` transitions MUST follow the FSM (see `blackboard-lifecycle.puml`).
+    - Once `status = SEALED`, no further Contributions or Panels may be
+      written; the Blackboard is immutable except for audit-ledger reads.
+
+    **Assignment Rules**:
+
+    - `id`, `timestamp` are assigned at create time and
+      MUST NOT be modified.
+    - `name` comes from the create-call body and MUST NOT be modified
+      after creation.
+    - `sealTimestamp` is assigned by the seal transition.
+  end note
+
+  enum BlackboardStatus {
+    OPEN
+    SEALING
+    SEALED
+    ABORTED
+  }
+
+  note bottom of BlackboardStatus
+    **BlackboardStatus** -- Blackboard lifecycle (sealed enum).
+
+    **Concept Semantics**:
+
+    - `OPEN`: writes accepted; reads return the live contribution view.
+    - `SEALING`: transient state during the seal transition; writes
+      are rejected (409) and the contribution stream is being frozen.
+    - `SEALED`: terminal-success; contribution stream is byte-stable
+      and the audit ledger is closed. Reads remain available.
+    - `ABORTED`: terminal-failure; reached from `OPEN` (client abort) or
+      `SEALING` (irrecoverable failure). Writes rejected (409).
+
+    See `blackboard-lifecycle.puml` for the authoritative FSM.
+  end note
+
+  ' ============================================================
+  ' PANEL
+  ' ============================================================
+
+  class Panel {
+    +getId(): URI
+    +getBlackboard(): Blackboard
+    +getName(): String
+    +getDescription(): String
+    +getSlots(): ContributionSlot[]
+  }
+
+  note bottom of Panel
+    **Panel** -- client-declared topological unit grouping ContributionSlots.
+
+    **Concept Semantics**:
+
+    - A Panel is a client-namespaced grouping of ContributionSlots inside
+      a Blackboard. The service does not interpret panel semantics; it
+      only enforces structural invariants (namespacing, freezing).
+    - Panel topology is **frozen** as soon as the first Contribution is
+      accepted on the Blackboard.
+
+    **Attribute Semantics**:
+
+    - `id`: server-minted resource identifier (URI). Immutable.
+    - `blackboard`: parent Blackboard (composition back-reference).
+    - `name`: client-namespaced (`{clientPrefix}:{LocalName}`).
+    - `description`: free-form documentation. Mandatory.
+    - `slots`: the ContributionSlots declared on this panel.
+
+    **Validation Rules**:
+
+    - `name` MUST be client-namespaced; reserved prefixes `bb:` and
+      `_internal:` are rejected.
+    - `description` MUST be non-empty.
+    - Once any Contribution is accepted on the Blackboard, the panel
+      topology is frozen (no add/remove/edit of panels or slots).
+
+    **Assignment Rules**:
+
+    - `id` is server-minted at registration and MUST NOT be modified.
+    - `blackboard`, `name`, `description` assigned at registration and
+      MUST NOT be modified.
+  end note
+
+  class ContributionSlot {
+    +getId(): URI
+    +getPanel(): Panel
+    +getName(): String
+    +getSchemaUri(): URI
+    +getContributions(): Contribution[]
+  }
+
+  note bottom of ContributionSlot
+    **ContributionSlot** -- typed write surface inside a Panel.
+
+    **Concept Semantics**:
+
+    - A ContributionSlot is the typed surface against which Contributions
+      are validated. It carries the slot's JSON Schema URI.
+    - Multiple Contributions per slot are accepted; reducing them is a
+      client-controller concern over the sealed stream (see SKILL.md
+      section 5).
+
+    **Attribute Semantics**:
+
+    - `id`: server-minted resource identifier (URI). Immutable.
+    - `panel`: parent Panel (composition back-reference).
+    - `name`: slot name, unique within its parent Panel.
+    - `schemaUri`: JSON Schema URI for `Contribution.post`; MUST be
+      retrievable by the service (cached by URI).
+    - `contributions`: the Contributions accepted into this slot.
+
+    **Validation Rules**:
+
+    - `name` MUST be unique within its Panel.
+    - `schemaUri` MUST be retrievable; resolution failure rejects the
+      panel registration.
+
+    **Assignment Rules**:
+
+    - `id` is server-minted at panel registration and MUST NOT be
+      modified.
+    - `panel`, `name`, `schemaUri` are assigned at panel registration
+      and frozen with the panel.
+  end note
+
+  ' ============================================================
+  ' CONTRIBUTION
+  ' ============================================================
+
+  class Contribution {
+    +getId(): URI
+    +getContributionSlot(): ContributionSlot
+    +getPost(): JsonObject
+    +getDerivedContribution(): Contribution[]
+    +getTimestamp(): Instant
+  }
+
+  note bottom of Contribution
+    **Contribution** -- single fact posted by a client KS or reducer.
+
+    **Concept Semantics**:
+
+    - A Contribution is an immutable, server-validated fact recorded
+      against a `ContributionSlot` of an `OPEN` Blackboard. Once
+      persisted it never changes; it appears in the byte-stable sealed
+      stream after seal.
+    - Contributions are written by client-side producers (Knowledge
+      Sources or client reducers/controllers). The substrate does not
+      distinguish them.
+
+    **Attribute Semantics**:
+
+    - `id`: server-minted contribution URI; appears in the sealed stream.
+    - `contributionSlot`: parent ContributionSlot (composition back-reference).
+    - `post`: validated against `slot.schemaUri` at POST time.
+    - `derivedContribution`: optional in-Blackboard contribution lineage;
+      MUST reference contributions in the **same** Blackboard
+      (Blackboards are isolated; no cross-Bb references).
+    - `timestamp`: server-assigned timestamp; participates in the
+      sealed-stream ordering.
+
+    **Validation Rules**:
+
+    - Blackboard MUST be `OPEN`; POST against `SEALING` or `SEALED`
+      returns 409.
+    - `post` MUST validate against `slot.schemaUri`; failure returns
+      422 (no record persisted).
+    - `derivedContribution` URIs MUST reference contributions in the
+      **same** Blackboard; cross-Blackboard URIs are rejected (422).
+
+    **Assignment Rules**:
+
+    - All fields are assigned at POST time and MUST NOT be modified.
+  end note
+
+  ' ============================================================
+  ' RELATIONSHIPS
+  ' ============================================================
+
+  Blackboard --> BlackboardStatus
+  Blackboard "1" *-- "1..*" Panel
+  Panel "1" *-- "1..*" ContributionSlot
+  ContributionSlot "1" *-- "0..*" Contribution
+  Contribution "0..*" --> "0..*" Contribution : derivedContribution
+}
+
+@enduml

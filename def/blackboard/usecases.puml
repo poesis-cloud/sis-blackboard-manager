@@ -1,0 +1,102 @@
+@startuml usecases
+
+' ============================================================
+' VISUAL THEME
+' ============================================================
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam ArrowColor #57606A
+skinparam DefaultFontName "SansSerif"
+skinparam backgroundColor #FFFFFF
+
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #57606A
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #57606A
+}
+skinparam packageStyle rectangle
+skinparam packageBackgroundColor #F6F8FA
+skinparam packageBorderColor #57606A
+skinparam noteBackgroundColor #FFF8C5
+skinparam noteBorderColor #57606A
+
+frame "UC - Definition Blackboard Manager (REST API consumers)" {
+
+  actor "Knowledge Source" as KS
+  actor "Controller"       as Ctrl
+
+  package "Blackboard resource" {
+    usecase "Create Blackboard\n(POST /blackboards)" as UC_Create
+    usecase "Get Blackboard state\n(GET /blackboards/{id})" as UC_GetBB
+    usecase "Abort Blackboard\n(POST /blackboards/{id}/abort)" as UC_Abort
+    usecase "Declare panels + slots\n(POST /blackboards/{id}/panels)" as UC_Declare
+    usecase "Read live state\n(GET /blackboards/{id}/state)" as UC_ReadLive
+    usecase "Seal Blackboard\n(POST /blackboards/{id}/seal;\n bb:seal scope)" as UC_Seal
+  }
+
+  package "Contribution resource" {
+    usecase "Post contribution\n(POST /blackboards/{id}/contributions)" as UC_Post
+    usecase "List contributions\n(GET /blackboards/{id}/contributions?\npanel=&slot=)" as UC_List
+    usecase "Read sealed contribution stream\n(GET /blackboards/{id}/contributions;\n byte-stable on SEALED Bb)" as UC_ReadSealed
+  }
+
+  Ctrl --> UC_Create
+  Ctrl --> UC_Abort
+  Ctrl --> UC_GetBB
+  Ctrl --> UC_Declare
+  Ctrl --> UC_ReadLive
+  Ctrl --> UC_List
+  Ctrl --> UC_Seal
+  Ctrl --> UC_ReadSealed : input to client-side\nreduction process
+  Ctrl --> UC_Post : write terminal\n<client>:Resolved.*\ncontributions
+
+  KS --> UC_Post
+  KS --> UC_ReadLive
+  KS --> UC_List
+
+  note right of UC_Post
+    Service is **domain-agnostic**: contribution `post`
+    is validated only against the slot's `schemaUri`. The
+    service does not interpret domain meaning and does not
+    reduce contributions; multiple contributions per slot
+    are accepted and reduction is a client-controller concern.
+  end note
+
+  note right of UC_Seal
+    Sealing freezes the contribution stream (no further
+    writes; byte-stable order). The service does **not**
+    reduce contributions: there is no /resolution endpoint.
+    Reducing per slot is a client controller concern -- see
+    the Client Controller actor.
+  end note
+
+  note bottom of Ctrl
+    The **Controller** is the client-side orchestrator: it owns
+    the Blackboard lifecycle (create / declare panels / seal /
+    abort), reads the sealed contribution stream, applies a
+    client-defined reducer (any algorithm), and optionally
+    writes the reduced view back as terminal contributions on
+    a `<client>:Resolved.*` panel so the reduction output is
+    itself a first-class auditable Bb citizen.
+    Replay = re-fetch the sealed stream + re-run the reducer
+    at its recorded version. Substrate guarantees byte-stable
+    inputs; the Controller records the reducer code/config.
+
+    The **Knowledge Source** is a client-side worker that just
+    posts contributions against declared slots; many KSs run
+    concurrently within one Controller-orchestrated Blackboard.
+  end note
+
+  note bottom of UC_Create
+    Each `Blackboard` is fully isolated: a self-standing resource
+    with its own seal lifecycle and no inter-Blackboard relation
+    (no correlation, no chaining, no shared lineage). Client
+    flows that span multiple Blackboards must do their own
+    bookkeeping out-of-band; the substrate does not see it.
+  end note
+}
+
+@enduml

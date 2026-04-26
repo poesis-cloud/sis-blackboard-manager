@@ -1,0 +1,92 @@
+@startuml blackboard-lifecycle
+
+' ============================================================
+' VISUAL THEME
+' ============================================================
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 12
+skinparam ArrowColor #57606A
+skinparam DefaultFontName "SansSerif"
+skinparam backgroundColor #FFFFFF
+
+skinparam state {
+  BackgroundColor #FFFFFF
+  BorderColor #57606A
+  FontColor #24292F
+}
+skinparam noteBackgroundColor #FFF8C5
+skinparam noteBorderColor #57606A
+
+title Definition Blackboard Manager - Blackboard lifecycle (server-owned)
+
+note as N_Scope
+  **Scope** -- State machine for one `Blackboard`. There is no Run,
+  no Phase, no chaining, no correlation concept on the service side.
+  **Each Blackboard is fully isolated** -- a self-standing resource
+  with this lifecycle and no inter-Blackboard relation. Server-owned:
+  clients cannot bypass the FSM. The seal transition is what makes
+  the contribution stream byte-stable and replay-able by client-side
+  reducers.
+end note
+
+[*] --> OPEN : POST /blackboards\n(BlackboardConfig)
+
+state OPEN
+state SEALING
+state SEALED
+
+note right of OPEN
+  - Accepts panel + slot declarations until first contribution.
+  - Accepts contributions until seal request.
+  - GETs return live counts.
+end note
+
+OPEN --> OPEN : POST /blackboards/{id}/panels (until first contribution)
+OPEN --> OPEN : POST /blackboards/{id}/contributions
+OPEN --> SEALING : POST /blackboards/{id}/seal\n(bb:seal scope)
+OPEN --> ABORTED : POST /blackboards/{id}/abort
+
+note right of SEALING
+  - No further writes accepted (409).
+  - Stream is being frozen and indexed for byte-stable read order.
+  - Seal event appended to audit ledger.
+end note
+
+SEALING --> SEALED : success\n(stream frozen, audit committed)
+SEALING --> ABORTED : irrecoverable error\n(persistence failure, etc.)
+
+note right of SEALED
+  - Blackboard frozen forever.
+  - Contributions stream is byte-stable;
+    `GET /blackboards/{id}/contributions` is deterministic
+    for any subset filter.
+  - Client controller MAY now run reducers client-side over
+    the sealed stream.
+end note
+
+SEALED --> [*]
+ABORTED --> [*]
+
+note bottom of SEALING
+  **Why server-side seal?**
+
+  - **Single arbiter.** Multiple client KSs may post concurrently;
+    a centralized seal removes the need for distributed consensus
+    on "are we done".
+  - **Deterministic replay anchor.** The seal moment is the audit
+    anchor: everything before it is in the ledger and the stream;
+    everything after it reads from the immutable, byte-stable
+    contribution stream.
+  - **No service-side reduction.** SEALING does NOT execute any
+    resolver or merger. Reduction lives in the client controller,
+    where it is a logged/replayable process over the sealed
+    inputs.
+  - **Blackboard isolation.** Each Blackboard is a self-standing
+    unit. The substrate exposes no inter-Blackboard relation:
+    no correlation, no chaining, no shared lineage. Any client
+    flow that spans multiple Blackboards is responsible for its
+    own bookkeeping out-of-band.
+end note
+
+@enduml

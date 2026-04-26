@@ -1,0 +1,121 @@
+@startuml component
+
+' ============================================================
+' VISUAL THEME
+' ============================================================
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 12
+skinparam ArrowColor #57606A
+skinparam DefaultFontName "SansSerif"
+skinparam backgroundColor #FFFFFF
+
+skinparam packageStyle rectangle
+skinparam packageBackgroundColor #F6F8FA
+skinparam packageBorderColor #57606A
+skinparam componentBackgroundColor #FFFFFF
+skinparam componentBorderColor #57606A
+skinparam actorBackgroundColor #FFFFFF
+skinparam actorBorderColor #57606A
+skinparam databaseBackgroundColor #FFFFFF
+skinparam databaseBorderColor #57606A
+skinparam noteBackgroundColor #FFF8C5
+skinparam noteBorderColor #57606A
+
+frame "PD - Definition Blackboard Manager - Component view" {
+
+  actor "Knowledge Source" as A_KS
+  actor "Controller"       as A_Ctrl
+
+  package "REST API surface" as API_PKG {
+    component "Blackboard resource"   as R_BB
+    component "Contribution resource" as R_Contrib
+  }
+
+  package "Domain logic" as LOGIC_PKG {
+    component "Blackboard Service"        as S_BB
+    component "Panel Service"             as S_Panel
+    component "ContributionSlot Service"  as S_Slot
+    component "Contribution Service"      as S_Contrib
+  }
+
+  package "Persistence" as PERS_PKG {
+    component "Blackboard Repository"        as Repo_BB
+    component "Panel Repository"             as Repo_Panel
+    component "ContributionSlot Repository"  as Repo_Slot
+    component "Contribution Repository"      as Repo_Contrib
+  }
+
+  database "Postgres / object store" as DB
+
+  A_Ctrl --> R_BB
+  A_Ctrl --> R_Contrib
+  A_KS   --> R_Contrib
+
+  R_BB      --> S_BB
+  R_BB      --> S_Panel
+  R_BB      --> S_Slot
+  R_Contrib --> S_Contrib
+
+  S_BB      --> Repo_BB
+  S_Panel   --> Repo_Panel
+  S_Slot    --> Repo_Slot
+  S_Contrib --> Repo_Contrib
+
+  Repo_BB      --> DB
+  Repo_Panel   --> DB
+  Repo_Slot    --> DB
+  Repo_Contrib --> DB
+
+  note right of A_KS
+    **Actors** (client-side, authenticated by scope):
+    - **Knowledge Source** (`bb:write`): posts contributions
+      against declared slots. One client run typically has
+      many concurrent KSs.
+    - **Controller** (`bb:bb-admin` + `bb:seal` + `bb:write`
+      + `bb:read`): orchestrates the Blackboard lifecycle --
+      creates/aborts the Blackboard, declares panels, requests
+      seal, reads live + sealed streams + audit, runs the
+      client-side reducer over the sealed stream, and may
+      post terminal reduced contributions on a
+      `<client>:Resolved.*` panel before seal. Downstream
+      consumers (Definition Manager, ops tooling, other
+      sourcers) read through the Controller's client process
+      or directly via `bb:read`.
+  end note
+
+  note bottom of API_PKG
+    REST surface (rooted on `Blackboard`):
+    - `POST/GET /blackboards[/{id}]`
+    - `POST /blackboards/{id}/abort`
+    - `POST /blackboards/{id}/seal`
+    - `GET  /blackboards/{id}/state`
+    - `POST/GET /blackboards/{id}/panels`
+      (Panel + ContributionSlot are declared here; not separate resources)
+    - `POST/GET /blackboards/{id}/contributions`
+  end note
+
+  note bottom of LOGIC_PKG
+    All domain logic is **generic**: panels are declared by the
+    client at Blackboard creation time and validated only against
+    the per-Blackboard topology declared by `Panel Service` /
+    `ContributionSlot Service`. No panel name is hardcoded; no
+    domain ontology is embedded. There is no Run, no Phase, no
+    Resolver, no Reduction concept on the service side.
+    `Blackboard Service` owns the per-Blackboard state machine
+    (OPEN -> SEALING -> SEALED | ABORTED) and freezes the
+    contribution stream; reducing contributions per slot is a
+    client-controller concern executed against
+    `GET /blackboards/{id}/contributions` after the Blackboard is
+    sealed.
+  end note
+
+  note bottom of PERS_PKG
+    One Repository per persisted class. The sealed contribution
+    stream is byte-stable: `Contribution Repository` returns rows
+    deterministically ordered by `(panel, slot, timestamp, id)`
+    after seal. This is the replay anchor for client-side reducers.
+  end note
+}
+
+@enduml
