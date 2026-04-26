@@ -5,5 +5,6 @@ final class JsonSchemaResource {
   /** Location of a permissive JSON Schema that accepts any JSON object. */
   static final String PASSTHROUGH_SCHEMA = "schemas/passthrough.json";
 
-  private JsonSchemaResource() {}
+  private JsonSchemaResource() {
+  }
 }

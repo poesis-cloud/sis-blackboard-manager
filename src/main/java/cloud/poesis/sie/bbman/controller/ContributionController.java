@@ -19,7 +19,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Contribution REST endpoints under {@code /api/v1/blackboards/{bbId}/contributions}.
+ * Contribution REST endpoints under
+ * {@code /api/v1/blackboards/{bbId}/contributions}.
  *
  * @author Clément Cazaud
  * @since 1.0.0
@@ -38,11 +39,10 @@ public class ContributionController extends AbstractController {
   @PostMapping
   public ResponseEntity<ContributionDto> post(
       @PathVariable UUID blackboardId, @Valid @RequestBody ContributionPostDto body) {
-    ContributionEntity c =
-        contributionService.post(
-            blackboardId, body.panel(), body.slot(), body.post(), body.derivedContribution());
+    ContributionEntity c = contributionService.post(
+        blackboardId, body.panel(), body.slot(), body.post(), body.derivedContribution());
     return ResponseEntity.created(
-            URI.create("/api/v1/blackboards/" + blackboardId + "/contributions/" + c.getId()))
+        URI.create("/api/v1/blackboards/" + blackboardId + "/contributions/" + c.getId()))
         .body(ContributionDto.from(c));
   }
 

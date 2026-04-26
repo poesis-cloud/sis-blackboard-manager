@@ -26,11 +26,10 @@ class ExceptionTypesTest {
   @Test
   void ruleViolationFactoryAndExtensions() {
     UUID bbId = UUID.randomUUID();
-    RuleViolationException ex =
-        RuleViolationException.of(
-            BlackboardConsistencyRuleType.BLACKBOARD_NOT_OPEN_FOR_WRITE,
-            "not open",
-            "blackboardId", bbId);
+    RuleViolationException ex = RuleViolationException.of(
+        BlackboardConsistencyRuleType.BLACKBOARD_NOT_OPEN_FOR_WRITE,
+        "not open",
+        "blackboardId", bbId);
     assertThat(ex.getRuleType())
         .isEqualTo(BlackboardConsistencyRuleType.BLACKBOARD_NOT_OPEN_FOR_WRITE);
     assertThat(ex.getMessage()).isEqualTo("not open");
@@ -43,12 +42,11 @@ class ExceptionTypesTest {
   @Test
   void ruleViolationFactoryWithCause() {
     Throwable cause = new IllegalStateException("boom");
-    RuleViolationException ex =
-        RuleViolationException.of(
-            BlackboardConsistencyRuleType.SLOT_SCHEMA_URI_UNRESOLVABLE,
-            "bad",
-            cause,
-            "key", "value");
+    RuleViolationException ex = RuleViolationException.of(
+        BlackboardConsistencyRuleType.SLOT_SCHEMA_URI_UNRESOLVABLE,
+        "bad",
+        cause,
+        "key", "value");
     assertThat(ex.getCause()).isSameAs(cause);
     assertThat(ex.getSite()).containsEntry("key", "value");
   }
@@ -56,21 +54,18 @@ class ExceptionTypesTest {
   @Test
   void ruleViolationOddPairsRejected() {
     assertThatThrownBy(
-            () ->
-                RuleViolationException.of(
-                    BlackboardConsistencyRuleType.PANEL_NAME_RESERVED_PREFIX, "x", "k1"))
+        () -> RuleViolationException.of(
+            BlackboardConsistencyRuleType.PANEL_NAME_RESERVED_PREFIX, "x", "k1"))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void ruleViolationCtors() {
-    RuleViolationException ex =
-        new RuleViolationException(
-            BlackboardConsistencyRuleType.PANEL_DESCRIPTION_REQUIRED, "x", Map.of("a", 1));
+    RuleViolationException ex = new RuleViolationException(
+        BlackboardConsistencyRuleType.PANEL_DESCRIPTION_REQUIRED, "x", Map.of("a", 1));
     assertThat(ex.getSite()).containsEntry("a", 1);
-    RuleViolationException ex2 =
-        new RuleViolationException(
-            BlackboardConsistencyRuleType.PANEL_DESCRIPTION_REQUIRED, "x");
+    RuleViolationException ex2 = new RuleViolationException(
+        BlackboardConsistencyRuleType.PANEL_DESCRIPTION_REQUIRED, "x");
     assertThat(ex2.getSite()).isEmpty();
   }
 

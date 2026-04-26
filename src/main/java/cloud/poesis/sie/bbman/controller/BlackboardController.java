@@ -25,7 +25,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Blackboard, Panel and ContributionSlot REST endpoints under {@code /api/v1/blackboards}.
+ * Blackboard, Panel and ContributionSlot REST endpoints under
+ * {@code /api/v1/blackboards}.
  *
  * @author Clément Cazaud
  * @since 1.0.0
@@ -76,8 +77,7 @@ public class BlackboardController extends AbstractController {
   @GetMapping("/{id}/state")
   public BlackboardStateDto state(@PathVariable UUID id) {
     BlackboardEntity bb = blackboardService.getById(id);
-    List<PanelDto> panels =
-        panelService.listByBlackboardWithSlots(id).stream().map(PanelDto::from).toList();
+    List<PanelDto> panels = panelService.listByBlackboardWithSlots(id).stream().map(PanelDto::from).toList();
     long count = contributionService.countByBlackboardId(id);
     return BlackboardStateDto.from(bb, panels, count);
   }
@@ -91,7 +91,7 @@ public class BlackboardController extends AbstractController {
         .forEach(spec -> slotService.declare(panel.getId(), spec.name(), spec.schemaUri()));
     PanelEntity reloaded = panelService.getByIdWithSlots(panel.getId());
     return ResponseEntity.created(
-            URI.create("/api/v1/blackboards/" + id + "/panels/" + panel.getId()))
+        URI.create("/api/v1/blackboards/" + id + "/panels/" + panel.getId()))
         .body(PanelDto.from(reloaded));
   }
 

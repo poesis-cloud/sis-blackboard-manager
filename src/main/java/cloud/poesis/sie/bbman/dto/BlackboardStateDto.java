@@ -1,10 +1,11 @@
 package cloud.poesis.sie.bbman.dto;
 
-import cloud.poesis.sie.bbman.entity.BlackboardEntity;
-import cloud.poesis.sie.bbman.type.BlackboardStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
+import cloud.poesis.sie.bbman.entity.BlackboardEntity;
+import cloud.poesis.sie.bbman.type.BlackboardStatus;
 
 /**
  * Response payload representing the full state of a Blackboard.

@@ -12,8 +12,11 @@ import org.springframework.security.web.SecurityFilterChain;
 /**
  * Spring Security configuration for Blackboard Manager.
  *
- * <p>During the design phase, REST endpoints under {@code /api/v1/blackboards/**} are open
- * ({@code permitAll}); JWT bearer auth wires the resource server when a JWK set URI is configured.
+ * <p>
+ * During the design phase, REST endpoints under {@code /api/v1/blackboards/**}
+ * are open
+ * ({@code permitAll}); JWT bearer auth wires the resource server when a JWK set
+ * URI is configured.
  *
  * @author Clément Cazaud
  * @since 1.0.0
@@ -29,16 +32,15 @@ public class SecurityConfig {
     http.csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
-            auth ->
-                auth.requestMatchers(
-                        "/actuator/health/**",
-                        "/actuator/info",
-                        "/v3/api-docs/**",
-                        "/swagger-ui/**",
-                        "/api/v1/blackboards/**")
-                    .permitAll()
-                    .anyRequest()
-                    .authenticated());
+            auth -> auth.requestMatchers(
+                "/actuator/health/**",
+                "/actuator/info",
+                "/v3/api-docs/**",
+                "/swagger-ui/**",
+                "/api/v1/blackboards/**")
+                .permitAll()
+                .anyRequest()
+                .authenticated());
 
     if (oauth2LoginEnabled) {
       http.oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));

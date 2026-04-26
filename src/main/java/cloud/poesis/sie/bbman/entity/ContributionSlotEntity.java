@@ -17,8 +17,10 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Typed write surface inside a {@link PanelEntity}. Carries the JSON Schema URI used to validate
- * each {@link ContributionEntity}'s {@code post} payload. Maps to the {@code contribution_slot}
+ * Typed write surface inside a {@link PanelEntity}. Carries the JSON Schema URI
+ * used to validate
+ * each {@link ContributionEntity}'s {@code post} payload. Maps to the
+ * {@code contribution_slot}
  * table.
  *
  * @author Clément Cazaud
@@ -47,7 +49,8 @@ public class ContributionSlotEntity {
   @OrderBy("timestamp ASC, id ASC")
   private List<ContributionEntity> contributions;
 
-  protected ContributionSlotEntity() {}
+  protected ContributionSlotEntity() {
+  }
 
   public ContributionSlotEntity(PanelEntity panel, String name, URI schemaUri) {
     this.panel = Objects.requireNonNull(panel, "panel");
@@ -78,8 +81,10 @@ public class ContributionSlotEntity {
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
+    if (this == o)
+      return true;
+    if (o == null || getClass() != o.getClass())
+      return false;
     ContributionSlotEntity that = (ContributionSlotEntity) o;
     return id != null && Objects.equals(id, that.id);
   }

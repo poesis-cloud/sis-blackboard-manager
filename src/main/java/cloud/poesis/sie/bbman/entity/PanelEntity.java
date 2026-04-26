@@ -16,7 +16,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Client-declared topological unit grouping {@link ContributionSlotEntity}s inside a
+ * Client-declared topological unit grouping {@link ContributionSlotEntity}s
+ * inside a
  * {@link BlackboardEntity}. Maps to the {@code panel} table.
  *
  * @author Clément Cazaud
@@ -45,7 +46,8 @@ public class PanelEntity {
   @OrderBy("name ASC")
   private List<ContributionSlotEntity> slots;
 
-  protected PanelEntity() {}
+  protected PanelEntity() {
+  }
 
   public PanelEntity(BlackboardEntity blackboard, String name, String description) {
     this.blackboard = Objects.requireNonNull(blackboard, "blackboard");
@@ -76,8 +78,10 @@ public class PanelEntity {
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
+    if (this == o)
+      return true;
+    if (o == null || getClass() != o.getClass())
+      return false;
     PanelEntity that = (PanelEntity) o;
     return id != null && Objects.equals(id, that.id);
   }

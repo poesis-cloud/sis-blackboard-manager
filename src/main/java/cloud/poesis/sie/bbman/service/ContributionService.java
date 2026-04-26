@@ -17,7 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Owns {@link ContributionRepository}. Validates {@code post} against the slot's JSON Schema and
+ * Owns {@link ContributionRepository}. Validates {@code post} against the
+ * slot's JSON Schema and
  * asserts derived-contribution lineage stays within the same Blackboard.
  *
  * @author Clément Cazaud
@@ -47,14 +48,16 @@ public class ContributionService {
   }
 
   /**
-   * Posts a new Contribution on an OPEN Blackboard. Validates the {@code post} payload against the
+   * Posts a new Contribution on an OPEN Blackboard. Validates the {@code post}
+   * payload against the
    * slot schema and rejects cross-Blackboard derived references.
    *
    * @param blackboardId the parent Blackboard id
-   * @param panelName the panel name
-   * @param slotName the slot name
-   * @param post the JSON payload
-   * @param derivedIds optional in-Blackboard contribution lineage ids; may be {@code null}
+   * @param panelName    the panel name
+   * @param slotName     the slot name
+   * @param post         the JSON payload
+   * @param derivedIds   optional in-Blackboard contribution lineage ids; may be
+   *                     {@code null}
    * @return the persisted contribution
    */
   public ContributionEntity post(
@@ -72,7 +75,8 @@ public class ContributionService {
     List<ContributionEntity> derived = resolveDerived(blackboardId, derivedIds);
 
     ContributionEntity saved = contributionRepository.save(new ContributionEntity(slot, post, derived));
-    // Force initialization of lazy associations needed for DTO mapping (open-in-view=false).
+    // Force initialization of lazy associations needed for DTO mapping
+    // (open-in-view=false).
     saved.getContributionSlot().getPanel().getName();
     saved.getDerivedContributions().size();
     return saved;
@@ -84,17 +88,14 @@ public class ContributionService {
     }
     List<ContributionEntity> resolved = new ArrayList<>(derivedIds.size());
     for (UUID id : derivedIds) {
-      ContributionEntity ref =
-          contributionRepository
-              .findById(id)
-              .orElseThrow(
-                  () ->
-                      RuleViolationException.of(
-                          BlackboardConsistencyRuleType.CONTRIBUTION_DERIVED_NOT_FOUND,
-                          "Derived contribution " + id + " not found.",
-                          "contributionId", id));
-      UUID refBlackboardId =
-          ref.getContributionSlot().getPanel().getBlackboard().getId();
+      ContributionEntity ref = contributionRepository
+          .findById(id)
+          .orElseThrow(
+              () -> RuleViolationException.of(
+                  BlackboardConsistencyRuleType.CONTRIBUTION_DERIVED_NOT_FOUND,
+                  "Derived contribution " + id + " not found.",
+                  "contributionId", id));
+      UUID refBlackboardId = ref.getContributionSlot().getPanel().getBlackboard().getId();
       if (!refBlackboardId.equals(blackboardId)) {
         throw RuleViolationException.of(
             BlackboardConsistencyRuleType.CONTRIBUTION_DERIVED_CROSS_BLACKBOARD,

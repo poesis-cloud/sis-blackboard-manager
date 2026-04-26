@@ -20,9 +20,12 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * Single fact posted by a client KS or reducer against a {@link ContributionSlotEntity} of an
- * {@code OPEN} {@link BlackboardEntity}. Immutable once persisted. Maps to the {@code contribution}
- * table; the {@code derived_contribution} link table holds the optional in-Blackboard contribution
+ * Single fact posted by a client KS or reducer against a
+ * {@link ContributionSlotEntity} of an
+ * {@code OPEN} {@link BlackboardEntity}. Immutable once persisted. Maps to the
+ * {@code contribution}
+ * table; the {@code derived_contribution} link table holds the optional
+ * in-Blackboard contribution
  * lineage.
  *
  * @author Clément Cazaud
@@ -49,13 +52,11 @@ public class ContributionEntity {
   private Instant timestamp;
 
   @ManyToMany(fetch = FetchType.LAZY)
-  @JoinTable(
-      name = "derived_contribution",
-      joinColumns = @JoinColumn(name = "contribution_id"),
-      inverseJoinColumns = @JoinColumn(name = "derived_id"))
+  @JoinTable(name = "derived_contribution", joinColumns = @JoinColumn(name = "contribution_id"), inverseJoinColumns = @JoinColumn(name = "derived_id"))
   private List<ContributionEntity> derivedContributions;
 
-  protected ContributionEntity() {}
+  protected ContributionEntity() {
+  }
 
   public ContributionEntity(
       ContributionSlotEntity contributionSlot,
@@ -63,8 +64,8 @@ public class ContributionEntity {
       List<ContributionEntity> derivedContributions) {
     this.contributionSlot = Objects.requireNonNull(contributionSlot, "contributionSlot");
     this.post = Objects.requireNonNull(post, "post");
-    this.derivedContributions =
-        derivedContributions == null ? new ArrayList<>() : new ArrayList<>(derivedContributions);
+    this.derivedContributions = derivedContributions == null ? new ArrayList<>()
+        : new ArrayList<>(derivedContributions);
   }
 
   public UUID getId() {
@@ -89,8 +90,10 @@ public class ContributionEntity {
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
+    if (this == o)
+      return true;
+    if (o == null || getClass() != o.getClass())
+      return false;
     ContributionEntity that = (ContributionEntity) o;
     return id != null && Objects.equals(id, that.id);
   }

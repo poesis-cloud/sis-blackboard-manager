@@ -14,7 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Owns {@link ContributionSlotRepository}. Schema URI resolvability is asserted at declare-time via
+ * Owns {@link ContributionSlotRepository}. Schema URI resolvability is asserted
+ * at declare-time via
  * {@link JsonSchemaValidationService}.
  *
  * @author Clément Cazaud
@@ -38,11 +39,12 @@ public class ContributionSlotService {
   }
 
   /**
-   * Declares a slot under the given Panel. Enforces unique name within the panel and schema URI
+   * Declares a slot under the given Panel. Enforces unique name within the panel
+   * and schema URI
    * resolvability.
    *
-   * @param panelId the parent Panel id
-   * @param name the slot name (unique within its panel)
+   * @param panelId   the parent Panel id
+   * @param name      the slot name (unique within its panel)
    * @param schemaUri the JSON Schema URI for {@code Contribution.post}
    * @return the persisted slot
    */
@@ -80,10 +82,11 @@ public class ContributionSlotService {
   }
 
   /**
-   * Resolves a slot by Panel id and name, throwing a {@code 422} rule violation if not found.
+   * Resolves a slot by Panel id and name, throwing a {@code 422} rule violation
+   * if not found.
    *
    * @param panelId the parent Panel id
-   * @param name the slot name
+   * @param name    the slot name
    * @return the resolved slot
    */
   @Transactional(value = "transactionManager", readOnly = true)
@@ -91,10 +94,9 @@ public class ContributionSlotService {
     return slotRepository
         .findByPanelIdAndName(panelId, name)
         .orElseThrow(
-            () ->
-                RuleViolationException.of(
-                    BlackboardConsistencyRuleType.CONTRIBUTION_SLOT_NOT_FOUND,
-                    "Slot '" + name + "' not found on panel " + panelId,
-                    "panelId", panelId, "slotName", name));
+            () -> RuleViolationException.of(
+                BlackboardConsistencyRuleType.CONTRIBUTION_SLOT_NOT_FOUND,
+                "Slot '" + name + "' not found on panel " + panelId,
+                "panelId", panelId, "slotName", name));
   }
 }

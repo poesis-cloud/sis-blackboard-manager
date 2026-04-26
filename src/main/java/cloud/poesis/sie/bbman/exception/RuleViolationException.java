@@ -7,7 +7,9 @@ import java.util.Map;
 /**
  * Generic Blackboard rule-violation exception.
  *
- * <p>Mapped to HTTP {@code 400}, {@code 409} or {@code 422} by the controller layer depending on
+ * <p>
+ * Mapped to HTTP {@code 400}, {@code 409} or {@code 422} by the controller
+ * layer depending on
  * {@link RuleType}, rendered as an RFC 9457 {@code ProblemDetail}.
  *
  * @author Clément Cazaud

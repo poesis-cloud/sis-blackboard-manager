@@ -19,9 +19,12 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class ServicesUnitCoverageTest {
 
-  @Autowired BlackboardService blackboardService;
-  @Autowired PanelService panelService;
-  @Autowired ContributionSlotService slotService;
+  @Autowired
+  BlackboardService blackboardService;
+  @Autowired
+  PanelService panelService;
+  @Autowired
+  ContributionSlotService slotService;
 
   private static final URI SCHEMA = URI.create("classpath:schemas/passthrough.json");
 
@@ -68,10 +71,9 @@ class ServicesUnitCoverageTest {
   @Test
   void panelServiceResolveByNameUnknownThrows422() {
     BlackboardEntity bb = blackboardService.create("bb-resolve-" + UUID.randomUUID());
-    RuleViolationException ex =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            RuleViolationException.class,
-            () -> panelService.resolveByName(bb.getId(), "missing"));
+    RuleViolationException ex = org.junit.jupiter.api.Assertions.assertThrows(
+        RuleViolationException.class,
+        () -> panelService.resolveByName(bb.getId(), "missing"));
     assertThat(ex.getRuleType())
         .isEqualTo(BlackboardConsistencyRuleType.CONTRIBUTION_PANEL_NOT_FOUND);
   }
@@ -97,9 +99,8 @@ class ServicesUnitCoverageTest {
     BlackboardEntity bb = blackboardService.create("bb-dup-slot-" + UUID.randomUUID());
     PanelEntity p = panelService.declare(bb.getId(), "p", "d");
     slotService.declare(p.getId(), "s", SCHEMA);
-    RuleViolationException ex =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            RuleViolationException.class, () -> slotService.declare(p.getId(), "s", SCHEMA));
+    RuleViolationException ex = org.junit.jupiter.api.Assertions.assertThrows(
+        RuleViolationException.class, () -> slotService.declare(p.getId(), "s", SCHEMA));
     assertThat(ex.getRuleType())
         .isEqualTo(BlackboardConsistencyRuleType.SLOT_NAME_NOT_UNIQUE_IN_PANEL);
   }
@@ -108,12 +109,10 @@ class ServicesUnitCoverageTest {
   void slotServiceUnresolvableSchemaRejected() {
     BlackboardEntity bb = blackboardService.create("bb-bad-schema-" + UUID.randomUUID());
     PanelEntity p = panelService.declare(bb.getId(), "p", "d");
-    RuleViolationException ex =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            RuleViolationException.class,
-            () ->
-                slotService.declare(
-                    p.getId(), "s", URI.create("classpath:schemas/missing.json")));
+    RuleViolationException ex = org.junit.jupiter.api.Assertions.assertThrows(
+        RuleViolationException.class,
+        () -> slotService.declare(
+            p.getId(), "s", URI.create("classpath:schemas/missing.json")));
     assertThat(ex.getRuleType())
         .isEqualTo(BlackboardConsistencyRuleType.SLOT_SCHEMA_URI_UNRESOLVABLE);
   }
@@ -122,10 +121,9 @@ class ServicesUnitCoverageTest {
   void slotServiceResolveByNameUnknownThrows422() {
     BlackboardEntity bb = blackboardService.create("bb-resolve-slot-" + UUID.randomUUID());
     PanelEntity p = panelService.declare(bb.getId(), "p", "d");
-    RuleViolationException ex =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            RuleViolationException.class,
-            () -> slotService.resolveByName(p.getId(), "missing"));
+    RuleViolationException ex = org.junit.jupiter.api.Assertions.assertThrows(
+        RuleViolationException.class,
+        () -> slotService.resolveByName(p.getId(), "missing"));
     assertThat(ex.getRuleType())
         .isEqualTo(BlackboardConsistencyRuleType.CONTRIBUTION_SLOT_NOT_FOUND);
   }

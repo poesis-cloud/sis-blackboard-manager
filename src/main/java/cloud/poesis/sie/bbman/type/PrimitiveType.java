@@ -1,7 +1,8 @@
 package cloud.poesis.sie.bbman.type;
 
 /**
- * Canonical primitive/resource types used by Blackboard Manager entities and diagnostics.
+ * Canonical primitive/resource types used by Blackboard Manager entities and
+ * diagnostics.
  *
  * @author Clément Cazaud
  * @since 1.0.0

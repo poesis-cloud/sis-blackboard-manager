@@ -14,7 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Owns {@link PanelRepository}. Cross-type lookups (Blackboard, Contribution count) go through the
+ * Owns {@link PanelRepository}. Cross-type lookups (Blackboard, Contribution
+ * count) go through the
  * owning service.
  *
  * @author Clément Cazaud
@@ -24,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional("transactionManager")
 public class PanelService {
 
-  private static final String[] RESERVED_PREFIXES = {"bb:", "_internal:"};
+  private static final String[] RESERVED_PREFIXES = { "bb:", "_internal:" };
 
   private final PanelRepository panelRepository;
   private final BlackboardService blackboardService;
@@ -40,12 +41,13 @@ public class PanelService {
   }
 
   /**
-   * Declares a new Panel under an OPEN Blackboard before any contribution has been accepted on it.
+   * Declares a new Panel under an OPEN Blackboard before any contribution has
+   * been accepted on it.
    * Panel topology freezes once the first contribution lands.
    *
    * @param blackboardId the parent Blackboard id
-   * @param name the client-namespaced panel name
-   * @param description the free-form description (must be non-blank)
+   * @param name         the client-namespaced panel name
+   * @param description  the free-form description (must be non-blank)
    * @return the persisted Panel
    */
   public PanelEntity declare(UUID blackboardId, String name, String description) {
@@ -104,11 +106,12 @@ public class PanelService {
   }
 
   /**
-   * Resolves a panel by Blackboard id and name, throwing a {@code 422} rule violation if not found
+   * Resolves a panel by Blackboard id and name, throwing a {@code 422} rule
+   * violation if not found
    * (the call originates from a Contribution post path).
    *
    * @param blackboardId the parent Blackboard id
-   * @param name the panel name
+   * @param name         the panel name
    * @return the resolved panel
    */
   @Transactional(value = "transactionManager", readOnly = true)
@@ -116,10 +119,9 @@ public class PanelService {
     return panelRepository
         .findByBlackboardIdAndName(blackboardId, name)
         .orElseThrow(
-            () ->
-                RuleViolationException.of(
-                    BlackboardConsistencyRuleType.CONTRIBUTION_PANEL_NOT_FOUND,
-                    "Panel '" + name + "' not found on Blackboard " + blackboardId,
-                    "blackboardId", blackboardId, "panelName", name));
+            () -> RuleViolationException.of(
+                BlackboardConsistencyRuleType.CONTRIBUTION_PANEL_NOT_FOUND,
+                "Panel '" + name + "' not found on Blackboard " + blackboardId,
+                "blackboardId", blackboardId, "panelName", name));
   }
 }

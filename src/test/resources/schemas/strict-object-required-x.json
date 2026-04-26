@@ -2,7 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "schemas/strict-object-required-x.json",
   "type": "object",
-  "required": ["x"],
+  "required": [
+    "x"
+  ],
   "properties": {
     "x": {
       "type": "string"

@@ -53,8 +53,7 @@ class EntitiesUnitTest {
     JsonNode node = JsonNodeFactory.instance.objectNode().put("k", "v");
     BlackboardEntity bb = new BlackboardEntity("bb");
     PanelEntity p = new PanelEntity(bb, "p", "d");
-    ContributionSlotEntity s =
-        new ContributionSlotEntity(p, "s", URI.create("classpath:schemas/passthrough.json"));
+    ContributionSlotEntity s = new ContributionSlotEntity(p, "s", URI.create("classpath:schemas/passthrough.json"));
     ContributionEntity c = new ContributionEntity(s, node, null);
     assertThat(c.getContributionSlot()).isSameAs(s);
     assertThat(c.getPost()).isEqualTo(node);
@@ -73,13 +72,11 @@ class EntitiesUnitTest {
     assertThat(p).isEqualTo(p).isNotEqualTo(null).isNotEqualTo("x");
     assertThat(p.hashCode()).isNotZero();
 
-    ContributionSlotEntity s =
-        new ContributionSlotEntity(p, "s", URI.create("classpath:schemas/passthrough.json"));
+    ContributionSlotEntity s = new ContributionSlotEntity(p, "s", URI.create("classpath:schemas/passthrough.json"));
     assertThat(s).isEqualTo(s).isNotEqualTo(null).isNotEqualTo("x");
     assertThat(s.hashCode()).isNotZero();
 
-    ContributionEntity c =
-        new ContributionEntity(s, JsonNodeFactory.instance.objectNode(), null);
+    ContributionEntity c = new ContributionEntity(s, JsonNodeFactory.instance.objectNode(), null);
     assertThat(c).isEqualTo(c).isNotEqualTo(null).isNotEqualTo("x");
     assertThat(c.hashCode()).isNotZero();
   }

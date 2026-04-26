@@ -10,9 +10,9 @@ import java.util.List;
 /**
  * Request body for {@code POST /api/v1/blackboards/{id}/panels}.
  *
- * @param name the client-namespaced panel name
+ * @param name        the client-namespaced panel name
  * @param description the free-form panel description (must be non-blank)
- * @param slots the slots to declare under this panel
+ * @param slots       the slots to declare under this panel
  * @author Clément Cazaud
  * @since 1.0.0
  */
@@ -24,8 +24,9 @@ public record PanelDeclarationDto(
   /**
    * Slot specification inside a panel declaration.
    *
-   * @param name the slot name (unique within its parent panel)
+   * @param name      the slot name (unique within its parent panel)
    * @param schemaUri the JSON Schema URI for {@code Contribution.post}
    */
-  public record SlotSpec(@NotBlank String name, @NotNull URI schemaUri) {}
+  public record SlotSpec(@NotBlank String name, @NotNull URI schemaUri) {
+  }
 }

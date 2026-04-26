@@ -13,7 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Owns the {@code Blackboard} entity and its lifecycle FSM (OPEN → SEALING → SEALED | ABORTED).
+ * Owns the {@code Blackboard} entity and its lifecycle FSM (OPEN → SEALING →
+ * SEALED | ABORTED).
  * Owns {@link BlackboardRepository}.
  *
  * @author Clément Cazaud
@@ -30,7 +31,8 @@ public class BlackboardService {
   }
 
   /**
-   * Creates a new Blackboard in {@code OPEN} status with the given client-supplied name.
+   * Creates a new Blackboard in {@code OPEN} status with the given
+   * client-supplied name.
    *
    * @param name client-supplied free-form label (must be non-blank)
    * @return the persisted blackboard
@@ -58,11 +60,14 @@ public class BlackboardService {
   }
 
   /**
-   * Asserts the Blackboard is {@code OPEN} (callable by other services for write-time gating).
+   * Asserts the Blackboard is {@code OPEN} (callable by other services for
+   * write-time gating).
    *
    * @param id the blackboard id
-   * @throws RuleViolationException with rule {@code BLACKBOARD_NOT_OPEN_FOR_WRITE} (HTTP 409) if
-   *     the blackboard is not OPEN
+   * @throws RuleViolationException with rule
+   *                                {@code BLACKBOARD_NOT_OPEN_FOR_WRITE} (HTTP
+   *                                409) if
+   *                                the blackboard is not OPEN
    */
   @Transactional(value = "transactionManager", readOnly = true)
   public BlackboardEntity getOpenOrFail(UUID id) {
@@ -96,8 +101,10 @@ public class BlackboardService {
   }
 
   /**
-   * Seals an OPEN Blackboard. Transitions OPEN → SEALING → SEALED in a single transaction (the
-   * substrate has no async work; SEALING is immediately followed by SEALED). If the persistence
+   * Seals an OPEN Blackboard. Transitions OPEN → SEALING → SEALED in a single
+   * transaction (the
+   * substrate has no async work; SEALING is immediately followed by SEALED). If
+   * the persistence
    * commit fails, the caller is expected to mark the blackboard as ABORTED.
    *
    * @param id the blackboard id

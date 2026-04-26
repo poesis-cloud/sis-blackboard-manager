@@ -3,8 +3,11 @@ package cloud.poesis.sie.bbman.type;
 /**
  * Consistency rules enforced by the Blackboard Manager substrate.
  *
- * <p>Each rule maps to a deterministic HTTP status (see {@code AbstractController}). All rule
- * semantics derive from {@code def/blackboard/blackboard.puml} and {@code blackboard-lifecycle.puml}.
+ * <p>
+ * Each rule maps to a deterministic HTTP status (see
+ * {@code AbstractController}). All rule
+ * semantics derive from {@code def/blackboard/blackboard.puml} and
+ * {@code blackboard-lifecycle.puml}.
  *
  * @author Clément Cazaud
  * @since 1.0.0

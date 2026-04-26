@@ -20,8 +20,11 @@ import org.springframework.stereotype.Service;
 /**
  * JSON Schema retrieval, caching and validation for slot {@code schemaUri}s.
  *
- * <p>Resolution and caching are done via the networknt {@link JsonSchemaFactory}; resolution
- * failures surface as {@code RuntimeException} so callers can map them to the appropriate rule
+ * <p>
+ * Resolution and caching are done via the networknt {@link JsonSchemaFactory};
+ * resolution
+ * failures surface as {@code RuntimeException} so callers can map them to the
+ * appropriate rule
  * violation.
  *
  * @author Clément Cazaud
@@ -34,12 +37,12 @@ public class JsonSchemaValidationService {
   private final Map<String, JsonSchema> cache = new ConcurrentHashMap<>();
 
   public JsonSchemaValidationService() {
-    this.schemaFactory =
-        JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
+    this.schemaFactory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
   }
 
   /**
-   * Loads (and caches) the schema referenced by {@code schemaUri}, throwing a runtime exception on
+   * Loads (and caches) the schema referenced by {@code schemaUri}, throwing a
+   * runtime exception on
    * resolution failure.
    *
    * @param schemaUri the JSON Schema URI
@@ -49,18 +52,18 @@ public class JsonSchemaValidationService {
   }
 
   /**
-   * Validates {@code instance} against the schema at {@code schemaUri}. On any validation message,
+   * Validates {@code instance} against the schema at {@code schemaUri}. On any
+   * validation message,
    * raises a {@link RuleViolationException} ({@code 422}).
    *
    * @param schemaUri the JSON Schema URI
-   * @param instance the JSON payload
+   * @param instance  the JSON payload
    */
   public void validate(URI schemaUri, JsonNode instance) {
     JsonSchema schema = load(schemaUri);
     Set<ValidationMessage> messages = schema.validate(instance);
     if (!messages.isEmpty()) {
-      String detail =
-          messages.stream().map(ValidationMessage::getMessage).collect(Collectors.joining("; "));
+      String detail = messages.stream().map(ValidationMessage::getMessage).collect(Collectors.joining("; "));
       Map<String, Object> site = new LinkedHashMap<>();
       site.put("schemaUri", schemaUri);
       site.put(

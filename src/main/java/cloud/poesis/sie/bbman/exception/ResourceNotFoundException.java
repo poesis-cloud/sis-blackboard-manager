@@ -6,9 +6,12 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Exception thrown when a Blackboard resource lookup by identifier returns no result.
+ * Exception thrown when a Blackboard resource lookup by identifier returns no
+ * result.
  *
- * <p>Mapped by the controller layer to HTTP {@code 404 Not Found} as RFC 9457 {@code ProblemDetail}.
+ * <p>
+ * Mapped by the controller layer to HTTP {@code 404 Not Found} as RFC 9457
+ * {@code ProblemDetail}.
  *
  * @author Clément Cazaud
  * @since 1.0.0

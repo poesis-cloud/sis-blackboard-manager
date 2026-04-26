@@ -9,7 +9,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 /**
  * Spring Data JPA repository for {@link ContributionSlotEntity}.
  *
- * <p>Per the Repository–Service exclusivity rule this repository is consumed exclusively by
+ * <p>
+ * Per the Repository–Service exclusivity rule this repository is consumed
+ * exclusively by
  * {@link cloud.poesis.sie.bbman.service.ContributionSlotService}.
  *
  * @author Clément Cazaud

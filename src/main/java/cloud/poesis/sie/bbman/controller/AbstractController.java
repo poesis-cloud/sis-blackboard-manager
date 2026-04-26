@@ -19,7 +19,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Common exception → RFC 9457 {@code ProblemDetail} mapping shared by all Blackboard Manager
+ * Common exception → RFC 9457 {@code ProblemDetail} mapping shared by all
+ * Blackboard Manager
  * controllers.
  *
  * @author Clément Cazaud
@@ -51,8 +52,7 @@ public abstract class AbstractController {
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ProblemDetail> handleBeanValidation(MethodArgumentNotValidException ex) {
-    ProblemDetail pd =
-        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Request body validation failed.");
+    ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Request body validation failed.");
     pd.setType(URI.create("bbm:exceptions/validation-error"));
     pd.setTitle("Validation error");
     Map<String, Object> fields = new LinkedHashMap<>();
@@ -82,8 +82,7 @@ public abstract class AbstractController {
   @ExceptionHandler(InternalException.class)
   public ResponseEntity<ProblemDetail> handleInternal(InternalException ex) {
     LOG.error("Internal error", ex);
-    ProblemDetail pd =
-        ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+    ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
     pd.setType(URI.create("bbm:exceptions/internal-error"));
     pd.setTitle("Internal error");
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(pd);
@@ -92,8 +91,7 @@ public abstract class AbstractController {
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ProblemDetail> handleAny(Exception ex) {
     LOG.error("Unhandled error", ex);
-    ProblemDetail pd =
-        ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+    ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
     pd.setType(URI.create("bbm:exceptions/internal-error"));
     pd.setTitle("Internal error");
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(pd);
@@ -113,12 +111,14 @@ public abstract class AbstractController {
       case BLACKBOARD_NOT_OPEN_FOR_WRITE,
           BLACKBOARD_NOT_OPEN_FOR_SEAL,
           BLACKBOARD_NOT_OPEN_FOR_ABORT,
-          PANEL_TOPOLOGY_FROZEN -> HttpStatus.CONFLICT;
+          PANEL_TOPOLOGY_FROZEN ->
+        HttpStatus.CONFLICT;
       case CONTRIBUTION_PANEL_NOT_FOUND,
           CONTRIBUTION_SLOT_NOT_FOUND,
           CONTRIBUTION_POST_SCHEMA_VIOLATION,
           CONTRIBUTION_DERIVED_CROSS_BLACKBOARD,
-          CONTRIBUTION_DERIVED_NOT_FOUND -> HttpStatus.UNPROCESSABLE_ENTITY;
+          CONTRIBUTION_DERIVED_NOT_FOUND ->
+        HttpStatus.UNPROCESSABLE_ENTITY;
       default -> HttpStatus.BAD_REQUEST;
     };
   }

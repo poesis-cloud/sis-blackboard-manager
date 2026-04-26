@@ -9,4 +9,5 @@ import jakarta.validation.constraints.NotBlank;
  * @author Clément Cazaud
  * @since 1.0.0
  */
-public record BlackboardConfigDto(@NotBlank String name) {}
+public record BlackboardConfigDto(@NotBlank String name) {
+}
