@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonSchemaValidationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sie-definition-blackboard-manager</a> &gt; <a href="index.source.html" class="el_package">cloud.poesis.sie.bbman.service</a> &gt; <span class="el_source">JsonSchemaValidationService.java</span></div><h1>JsonSchemaValidationService.java</h1><pre class="source lang-java linenums">package cloud.poesis.sie.bbman.service;
+
+import cloud.poesis.sie.bbman.exception.RuleViolationException;
+import cloud.poesis.sie.bbman.type.BlackboardConsistencyRuleType;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.networknt.schema.JsonSchema;
+import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.SchemaLocation;
+import com.networknt.schema.SchemaValidatorsConfig;
+import com.networknt.schema.SpecVersion;
+import com.networknt.schema.ValidationMessage;
+import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+
+/**
+ * JSON Schema retrieval, caching and validation for slot {@code schemaUri}s.
+ *
+ * &lt;p&gt;Resolution and caching are done via the networknt {@link JsonSchemaFactory}; resolution
+ * failures surface as {@code RuntimeException} so callers can map them to the appropriate rule
+ * violation.
+ *
+ * @author Clément Cazaud
+ * @since 1.0.0
+ */
+@Service
+public class JsonSchemaValidationService {
+
+  private final JsonSchemaFactory schemaFactory;
+<span class="fc" id="L34">  private final Map&lt;String, JsonSchema&gt; cache = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L36">  public JsonSchemaValidationService() {</span>
+<span class="fc" id="L37">    this.schemaFactory =</span>
+<span class="fc" id="L38">        JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);</span>
+<span class="fc" id="L39">  }</span>
+
+  /**
+   * Loads (and caches) the schema referenced by {@code schemaUri}, throwing a runtime exception on
+   * resolution failure.
+   *
+   * @param schemaUri the JSON Schema URI
+   */
+  public void assertResolvable(URI schemaUri) {
+<span class="fc" id="L48">    load(schemaUri);</span>
+<span class="fc" id="L49">  }</span>
+
+  /**
+   * Validates {@code instance} against the schema at {@code schemaUri}. On any validation message,
+   * raises a {@link RuleViolationException} ({@code 422}).
+   *
+   * @param schemaUri the JSON Schema URI
+   * @param instance the JSON payload
+   */
+  public void validate(URI schemaUri, JsonNode instance) {
+<span class="fc" id="L59">    JsonSchema schema = load(schemaUri);</span>
+<span class="fc" id="L60">    Set&lt;ValidationMessage&gt; messages = schema.validate(instance);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">    if (!messages.isEmpty()) {</span>
+<span class="fc" id="L62">      String detail =</span>
+<span class="fc" id="L63">          messages.stream().map(ValidationMessage::getMessage).collect(Collectors.joining(&quot;; &quot;));</span>
+<span class="fc" id="L64">      Map&lt;String, Object&gt; site = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L65">      site.put(&quot;schemaUri&quot;, schemaUri);</span>
+<span class="fc" id="L66">      site.put(</span>
+          &quot;messages&quot;,
+<span class="fc" id="L68">          messages.stream().map(ValidationMessage::getMessage).collect(Collectors.toList()));</span>
+<span class="fc" id="L69">      throw new RuleViolationException(</span>
+          BlackboardConsistencyRuleType.CONTRIBUTION_POST_SCHEMA_VIOLATION, detail, site);
+    }
+<span class="fc" id="L72">  }</span>
+
+  private JsonSchema load(URI schemaUri) {
+<span class="fc" id="L75">    return cache.computeIfAbsent(schemaUri.toString(), key -&gt; {</span>
+<span class="fc" id="L76">      SchemaValidatorsConfig config = new SchemaValidatorsConfig();</span>
+      try {
+<span class="fc" id="L78">        return schemaFactory.getSchema(SchemaLocation.of(key), config);</span>
+<span class="fc" id="L79">      } catch (Exception e) {</span>
+<span class="fc" id="L80">        throw new IllegalStateException(&quot;Cannot load schema at &quot; + schemaUri + &quot;: &quot; + e.getMessage(), e);</span>
+      }
+    });
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

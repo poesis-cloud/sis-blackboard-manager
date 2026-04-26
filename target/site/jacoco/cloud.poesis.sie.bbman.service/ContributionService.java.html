@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ContributionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sie-definition-blackboard-manager</a> &gt; <a href="index.source.html" class="el_package">cloud.poesis.sie.bbman.service</a> &gt; <span class="el_source">ContributionService.java</span></div><h1>ContributionService.java</h1><pre class="source lang-java linenums">package cloud.poesis.sie.bbman.service;
+
+import cloud.poesis.sie.bbman.entity.ContributionEntity;
+import cloud.poesis.sie.bbman.entity.ContributionSlotEntity;
+import cloud.poesis.sie.bbman.entity.PanelEntity;
+import cloud.poesis.sie.bbman.exception.ResourceNotFoundException;
+import cloud.poesis.sie.bbman.exception.RuleViolationException;
+import cloud.poesis.sie.bbman.repository.ContributionRepository;
+import cloud.poesis.sie.bbman.type.BlackboardConsistencyRuleType;
+import cloud.poesis.sie.bbman.type.PrimitiveType;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Owns {@link ContributionRepository}. Validates {@code post} against the slot's JSON Schema and
+ * asserts derived-contribution lineage stays within the same Blackboard.
+ *
+ * @author Clément Cazaud
+ * @since 1.0.0
+ */
+@Service
+@Transactional(&quot;transactionManager&quot;)
+public class ContributionService {
+
+  private final ContributionRepository contributionRepository;
+  private final BlackboardService blackboardService;
+  private final PanelService panelService;
+  private final ContributionSlotService slotService;
+  private final JsonSchemaValidationService jsonSchemaValidationService;
+
+  public ContributionService(
+      ContributionRepository contributionRepository,
+      BlackboardService blackboardService,
+      @Lazy PanelService panelService,
+      ContributionSlotService slotService,
+<span class="fc" id="L41">      JsonSchemaValidationService jsonSchemaValidationService) {</span>
+<span class="fc" id="L42">    this.contributionRepository = contributionRepository;</span>
+<span class="fc" id="L43">    this.blackboardService = blackboardService;</span>
+<span class="fc" id="L44">    this.panelService = panelService;</span>
+<span class="fc" id="L45">    this.slotService = slotService;</span>
+<span class="fc" id="L46">    this.jsonSchemaValidationService = jsonSchemaValidationService;</span>
+<span class="fc" id="L47">  }</span>
+
+  /**
+   * Posts a new Contribution on an OPEN Blackboard. Validates the {@code post} payload against the
+   * slot schema and rejects cross-Blackboard derived references.
+   *
+   * @param blackboardId the parent Blackboard id
+   * @param panelName the panel name
+   * @param slotName the slot name
+   * @param post the JSON payload
+   * @param derivedIds optional in-Blackboard contribution lineage ids; may be {@code null}
+   * @return the persisted contribution
+   */
+  public ContributionEntity post(
+      UUID blackboardId,
+      String panelName,
+      String slotName,
+      JsonNode post,
+      List&lt;UUID&gt; derivedIds) {
+<span class="fc" id="L66">    blackboardService.getOpenOrFail(blackboardId);</span>
+<span class="fc" id="L67">    PanelEntity panel = panelService.resolveByName(blackboardId, panelName);</span>
+<span class="fc" id="L68">    ContributionSlotEntity slot = slotService.resolveByName(panel.getId(), slotName);</span>
+
+<span class="fc" id="L70">    jsonSchemaValidationService.validate(slot.getSchemaUri(), post);</span>
+
+<span class="fc" id="L72">    List&lt;ContributionEntity&gt; derived = resolveDerived(blackboardId, derivedIds);</span>
+
+<span class="fc" id="L74">    ContributionEntity saved = contributionRepository.save(new ContributionEntity(slot, post, derived));</span>
+    // Force initialization of lazy associations needed for DTO mapping (open-in-view=false).
+<span class="fc" id="L76">    saved.getContributionSlot().getPanel().getName();</span>
+<span class="fc" id="L77">    saved.getDerivedContributions().size();</span>
+<span class="fc" id="L78">    return saved;</span>
+  }
+
+  private List&lt;ContributionEntity&gt; resolveDerived(UUID blackboardId, List&lt;UUID&gt; derivedIds) {
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">    if (derivedIds == null || derivedIds.isEmpty()) {</span>
+<span class="fc" id="L83">      return new ArrayList&lt;&gt;();</span>
+    }
+<span class="fc" id="L85">    List&lt;ContributionEntity&gt; resolved = new ArrayList&lt;&gt;(derivedIds.size());</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">    for (UUID id : derivedIds) {</span>
+<span class="fc" id="L87">      ContributionEntity ref =</span>
+          contributionRepository
+<span class="fc" id="L89">              .findById(id)</span>
+<span class="fc" id="L90">              .orElseThrow(</span>
+                  () -&gt;
+<span class="fc" id="L92">                      RuleViolationException.of(</span>
+                          BlackboardConsistencyRuleType.CONTRIBUTION_DERIVED_NOT_FOUND,
+                          &quot;Derived contribution &quot; + id + &quot; not found.&quot;,
+                          &quot;contributionId&quot;, id));
+<span class="fc" id="L96">      UUID refBlackboardId =</span>
+<span class="fc" id="L97">          ref.getContributionSlot().getPanel().getBlackboard().getId();</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">      if (!refBlackboardId.equals(blackboardId)) {</span>
+<span class="fc" id="L99">        throw RuleViolationException.of(</span>
+            BlackboardConsistencyRuleType.CONTRIBUTION_DERIVED_CROSS_BLACKBOARD,
+            &quot;Derived contribution &quot; + id + &quot; belongs to a different Blackboard.&quot;,
+            &quot;contributionId&quot;, id,
+            &quot;blackboardId&quot;, blackboardId,
+            &quot;foreignBlackboardId&quot;, refBlackboardId);
+      }
+<span class="fc" id="L106">      resolved.add(ref);</span>
+<span class="fc" id="L107">    }</span>
+<span class="fc" id="L108">    return resolved;</span>
+  }
+
+  @Transactional(value = &quot;transactionManager&quot;, readOnly = true)
+  public ContributionEntity getById(UUID id) {
+<span class="nc" id="L113">    return contributionRepository</span>
+<span class="nc" id="L114">        .findById(id)</span>
+<span class="nc" id="L115">        .orElseThrow(() -&gt; new ResourceNotFoundException(PrimitiveType.CONTRIBUTION, id));</span>
+  }
+
+  @Transactional(value = &quot;transactionManager&quot;, readOnly = true)
+  public List&lt;ContributionEntity&gt; listByBlackboard(
+      UUID blackboardId, String panelName, String slotName) {
+<span class="fc" id="L121">    blackboardService.getById(blackboardId);</span>
+    List&lt;ContributionEntity&gt; list;
+<span class="pc bpc" id="L123" title="1 of 4 branches missed.">    if (panelName == null &amp;&amp; slotName == null) {</span>
+<span class="fc" id="L124">      list = contributionRepository.findByBlackboardIdOrderedByteStable(blackboardId);</span>
+    } else {
+<span class="fc" id="L126">      list = contributionRepository.findByBlackboardIdFiltered(blackboardId, panelName, slotName);</span>
+    }
+<span class="fc bfc" id="L128" title="All 2 branches covered.">    for (ContributionEntity c : list) {</span>
+<span class="fc" id="L129">      c.getContributionSlot().getPanel().getName();</span>
+<span class="fc" id="L130">      c.getDerivedContributions().size();</span>
+<span class="fc" id="L131">    }</span>
+<span class="fc" id="L132">    return list;</span>
+  }
+
+  @Transactional(value = &quot;transactionManager&quot;, readOnly = true)
+  public long countByBlackboardId(UUID blackboardId) {
+<span class="fc" id="L137">    return contributionRepository.countByBlackboardId(blackboardId);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

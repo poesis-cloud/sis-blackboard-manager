@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    url: jdbc:tc:postgresql:16-alpine:///bbm_test
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    username: bbm
+    password: bbm
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ""
+
+bbm:
+  security:
+    oauth2-login-enabled: false
+
+management:
+  tracing:
+    enabled: false

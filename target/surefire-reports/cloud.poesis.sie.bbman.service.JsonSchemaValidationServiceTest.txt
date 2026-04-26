@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: cloud.poesis.sie.bbman.service.JsonSchemaValidationServiceTest
+-------------------------------------------------------------------------------
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.600 s -- in cloud.poesis.sie.bbman.service.JsonSchemaValidationServiceTest

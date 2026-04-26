@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SpotBugs exclusion filter for sie-definition-blackboard-manager.
+
+  Every entry is a verified false positive caused by a framework constraint
+  where a root-cause fix is impossible.
+-->
+<FindBugsFilter>
+
+  <!-- EntityManager fields - JPA container-managed proxy -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+    <Field type="jakarta.persistence.EntityManager"/>
+  </Match>
+
+  <!-- ObjectMapper fields - Spring-configured singleton -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+    <Field type="com.fasterxml.jackson.databind.ObjectMapper"/>
+  </Match>
+
+  <!-- JsonSchemaFactory - networknt singleton; no copy semantics -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+    <Field type="com.networknt.schema.JsonSchemaFactory"/>
+  </Match>
+
+  <!-- JPA-managed @OneToMany collection getters -->
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP"/>
+    <Class name="cloud.poesis.sie.bbman.entity.BlackboardEntity"/>
+    <Method name="getPanels"/>
+  </Match>
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP"/>
+    <Class name="cloud.poesis.sie.bbman.entity.PanelEntity"/>
+    <Method name="getSlots"/>
+  </Match>
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP"/>
+    <Class name="cloud.poesis.sie.bbman.entity.ContributionSlotEntity"/>
+    <Method name="getContributions"/>
+  </Match>
+  <Match>
+    <Bug pattern="EI_EXPOSE_REP"/>
+    <Class name="cloud.poesis.sie.bbman.entity.ContributionEntity"/>
+    <Method name="getDerivedContributions"/>
+  </Match>
+
+</FindBugsFilter>

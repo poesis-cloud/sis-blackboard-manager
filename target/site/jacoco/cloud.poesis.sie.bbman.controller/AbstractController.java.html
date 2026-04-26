@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">sie-definition-blackboard-manager</a> &gt; <a href="index.source.html" class="el_package">cloud.poesis.sie.bbman.controller</a> &gt; <span class="el_source">AbstractController.java</span></div><h1>AbstractController.java</h1><pre class="source lang-java linenums">package cloud.poesis.sie.bbman.controller;
+
+import cloud.poesis.sie.bbman.exception.InternalException;
+import cloud.poesis.sie.bbman.exception.ResourceNotFoundException;
+import cloud.poesis.sie.bbman.exception.RuleViolationException;
+import cloud.poesis.sie.bbman.type.BlackboardConsistencyRuleType;
+import cloud.poesis.sie.bbman.type.RuleType;
+import jakarta.validation.ConstraintViolationException;
+import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Common exception → RFC 9457 {@code ProblemDetail} mapping shared by all Blackboard Manager
+ * controllers.
+ *
+ * @author Clément Cazaud
+ * @since 1.0.0
+ */
+@RestController
+<span class="fc" id="L29">public abstract class AbstractController {</span>
+
+<span class="fc" id="L31">  private static final Logger LOG = LoggerFactory.getLogger(AbstractController.class);</span>
+
+  @ExceptionHandler(ResourceNotFoundException.class)
+  public ResponseEntity&lt;ProblemDetail&gt; handleNotFound(ResourceNotFoundException ex) {
+<span class="fc" id="L35">    ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());</span>
+<span class="fc" id="L36">    pd.setType(URI.create(ex.getType()));</span>
+<span class="fc" id="L37">    pd.setTitle(ex.getTitle());</span>
+<span class="fc" id="L38">    ex.getExtensions().forEach(pd::setProperty);</span>
+<span class="fc" id="L39">    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(pd);</span>
+  }
+
+  @ExceptionHandler(RuleViolationException.class)
+  public ResponseEntity&lt;ProblemDetail&gt; handleRuleViolation(RuleViolationException ex) {
+<span class="fc" id="L44">    HttpStatus status = mapRuleToHttpStatus(ex.getRuleType());</span>
+<span class="fc" id="L45">    ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, ex.getMessage());</span>
+<span class="fc" id="L46">    pd.setType(URI.create(ex.getType()));</span>
+<span class="fc" id="L47">    pd.setTitle(ex.getTitle());</span>
+<span class="fc" id="L48">    ex.getExtensions().forEach(pd::setProperty);</span>
+<span class="fc" id="L49">    return ResponseEntity.status(status).body(pd);</span>
+  }
+
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  public ResponseEntity&lt;ProblemDetail&gt; handleBeanValidation(MethodArgumentNotValidException ex) {
+<span class="fc" id="L54">    ProblemDetail pd =</span>
+<span class="fc" id="L55">        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, &quot;Request body validation failed.&quot;);</span>
+<span class="fc" id="L56">    pd.setType(URI.create(&quot;bbm:exceptions/validation-error&quot;));</span>
+<span class="fc" id="L57">    pd.setTitle(&quot;Validation error&quot;);</span>
+<span class="fc" id="L58">    Map&lt;String, Object&gt; fields = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L59">    ex.getBindingResult()</span>
+<span class="fc" id="L60">        .getFieldErrors()</span>
+<span class="fc" id="L61">        .forEach(fe -&gt; fields.put(fe.getField(), fe.getDefaultMessage()));</span>
+<span class="fc" id="L62">    pd.setProperty(&quot;fields&quot;, fields);</span>
+<span class="fc" id="L63">    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(pd);</span>
+  }
+
+  @ExceptionHandler(ConstraintViolationException.class)
+  public ResponseEntity&lt;ProblemDetail&gt; handleConstraintViolation(ConstraintViolationException ex) {
+<span class="fc" id="L68">    ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());</span>
+<span class="fc" id="L69">    pd.setType(URI.create(&quot;bbm:exceptions/validation-error&quot;));</span>
+<span class="fc" id="L70">    pd.setTitle(&quot;Validation error&quot;);</span>
+<span class="fc" id="L71">    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(pd);</span>
+  }
+
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity&lt;ProblemDetail&gt; handleIllegalArgument(IllegalArgumentException ex) {
+<span class="fc" id="L76">    ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());</span>
+<span class="fc" id="L77">    pd.setType(URI.create(&quot;bbm:exceptions/illegal-argument&quot;));</span>
+<span class="fc" id="L78">    pd.setTitle(&quot;Illegal argument&quot;);</span>
+<span class="fc" id="L79">    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(pd);</span>
+  }
+
+  @ExceptionHandler(InternalException.class)
+  public ResponseEntity&lt;ProblemDetail&gt; handleInternal(InternalException ex) {
+<span class="fc" id="L84">    LOG.error(&quot;Internal error&quot;, ex);</span>
+<span class="fc" id="L85">    ProblemDetail pd =</span>
+<span class="fc" id="L86">        ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());</span>
+<span class="fc" id="L87">    pd.setType(URI.create(&quot;bbm:exceptions/internal-error&quot;));</span>
+<span class="fc" id="L88">    pd.setTitle(&quot;Internal error&quot;);</span>
+<span class="fc" id="L89">    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(pd);</span>
+  }
+
+  @ExceptionHandler(Exception.class)
+  public ResponseEntity&lt;ProblemDetail&gt; handleAny(Exception ex) {
+<span class="fc" id="L94">    LOG.error(&quot;Unhandled error&quot;, ex);</span>
+<span class="fc" id="L95">    ProblemDetail pd =</span>
+<span class="fc" id="L96">        ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());</span>
+<span class="fc" id="L97">    pd.setType(URI.create(&quot;bbm:exceptions/internal-error&quot;));</span>
+<span class="fc" id="L98">    pd.setTitle(&quot;Internal error&quot;);</span>
+<span class="fc" id="L99">    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(pd);</span>
+  }
+
+  /**
+   * Maps a rule type to its canonical HTTP status.
+   *
+   * @param ruleType the rule type
+   * @return the HTTP status
+   */
+  protected HttpStatus mapRuleToHttpStatus(RuleType ruleType) {
+<span class="fc bfc" id="L109" title="All 2 branches covered.">    if (!(ruleType instanceof BlackboardConsistencyRuleType r)) {</span>
+<span class="fc" id="L110">      return HttpStatus.BAD_REQUEST;</span>
+    }
+<span class="fc bfc" id="L112" title="All 3 branches covered.">    return switch (r) {</span>
+      case BLACKBOARD_NOT_OPEN_FOR_WRITE,
+          BLACKBOARD_NOT_OPEN_FOR_SEAL,
+          BLACKBOARD_NOT_OPEN_FOR_ABORT,
+<span class="fc" id="L116">          PANEL_TOPOLOGY_FROZEN -&gt; HttpStatus.CONFLICT;</span>
+      case CONTRIBUTION_PANEL_NOT_FOUND,
+          CONTRIBUTION_SLOT_NOT_FOUND,
+          CONTRIBUTION_POST_SCHEMA_VIOLATION,
+          CONTRIBUTION_DERIVED_CROSS_BLACKBOARD,
+<span class="fc" id="L121">          CONTRIBUTION_DERIVED_NOT_FOUND -&gt; HttpStatus.UNPROCESSABLE_ENTITY;</span>
+<span class="fc" id="L122">      default -&gt; HttpStatus.BAD_REQUEST;</span>
+    };
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>
