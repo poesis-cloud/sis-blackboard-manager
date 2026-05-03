@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: cloud.poesis.sie.bbman.type.BlackboardConsistencyRuleTypeTest
--------------------------------------------------------------------------------
-Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.022 s -- in cloud.poesis.sie.bbman.type.BlackboardConsistencyRuleTypeTest

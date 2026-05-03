@@ -208,7 +208,7 @@ Everything else is client controller territory.
 
 The end-to-end REST sequence diagram (client-driven) lives in the
 first client sourcer that exercises this service:
-[itip-repository-definition-sourcer/def/blackboard-workflow.puml](../../itip/itip-repository-definition-sourcer/def/blackboard-workflow.puml).
+[itip-definition-blackboard-repository-sourcer/def/blackboard-workflow.puml](../../itip/itip-definition-blackboard-repository-sourcer/def/blackboard-workflow.puml).
 
 ---
 
@@ -236,7 +236,7 @@ Deliberately out of scope (client-side concerns):
 
 These were all part of the previous engine-loaded "Pack" model. They now
 live in client sourcer repositories (the first one being ITIP's
-[itip-repository-definition-sourcer](../../itip/itip-repository-definition-sourcer/)).
+[itip-definition-blackboard-repository-sourcer](../../itip/itip-definition-blackboard-repository-sourcer/)).
 
 ---
 
