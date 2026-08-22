@@ -1,5 +1,12 @@
 # SIE Definition Blackboard Manager
 
+[![CI](https://github.com/poesis-cloud/sie-definition-blackboard-manager/actions/workflows/ci.yaml/badge.svg)](https://github.com/poesis-cloud/sie-definition-blackboard-manager/actions/workflows/ci.yaml)
+[![Release](https://img.shields.io/github/v/release/poesis-cloud/sie-definition-blackboard-manager)](https://github.com/poesis-cloud/sie-definition-blackboard-manager/releases/latest)
+[![Coverage gate](https://img.shields.io/badge/JaCoCo-%E2%89%A595%25%20instruction%20coverage%20enforced-brightgreen)](pom.xml)
+[![Java](https://img.shields.io/badge/Java-21-orange)](pom.xml)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F)](pom.xml)
+[![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-blue)](LICENSE)
+
 A **generic, domain-agnostic REST blackboard service** for collaborative
 definition sourcing.
 
