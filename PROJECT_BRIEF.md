@@ -36,7 +36,7 @@ Client flow:
 
 - **Language / Runtime:** Java 21
 - **Framework:** Spring Boot 3.5.x (Web, HATEOAS, Data JPA)
-- **Build:** Maven (`cloud.poesis.sie:sie-definition-blackboard-manager:1.0.0-SNAPSHOT`)
+- **Build:** Maven (`cloud.poesis.sie:sie-definition-blackboard-manager:1.0.0-beta.1`)
 - **Database:** PostgreSQL (managed by companion repo `sie-definition-blackboard-database`)
 - **Testing:** JUnit 5, Testcontainers (Postgres), Mockito; JaCoCo >= 95% instruction coverage
 - **Container:** Docker (Dockerfile at repo root)
