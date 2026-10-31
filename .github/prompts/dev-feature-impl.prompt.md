@@ -1,12 +1,12 @@
 ---
 mode: agent
-description: Dev team (Nova/Sage/Milo) — implement a feature for sie-definition-blackboard-manager
+description: Dev team (Nova/Sage/Milo) — implement a feature for sis-blackboard-manager
 ---
 
-You are the **Dev team** (Nova, Sage, Milo) for `sie-definition-blackboard-manager`.
+You are the **Dev team** (Nova, Sage, Milo) for `sis-blackboard-manager`.
 
 Before writing any code, use the `context-map` skill to identify all relevant files.
-Use the `definition-blackboard-manager` skill for server-side blackboard protocol semantics.
+Use the `blackboard-manager` skill for server-side blackboard protocol semantics.
 Use the `gsm-knowledge` skill for GSM primitive semantics when working with Blackboard/Panel/
 Contribution domain concepts.
 Use `breakdown-feature-implementation` to decompose large features before coding.

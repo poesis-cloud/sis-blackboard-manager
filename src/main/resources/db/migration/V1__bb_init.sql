@@ -1,4 +1,4 @@
--- Flyway baseline migration for the Definition Blackboard Manager substrate.
+-- Flyway baseline migration for the Blackboard Manager substrate.
 -- Re-runnable: every DDL uses IF NOT EXISTS / OR REPLACE.
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;

@@ -23,7 +23,7 @@ skinparam packageBorderColor #57606A
 skinparam noteBackgroundColor #FFF8C5
 skinparam noteBorderColor #57606A
 
-frame "UC - Definition Blackboard Manager (REST API consumers)" {
+frame "UC - Blackboard Manager (REST API consumers)" {
 
   actor "Knowledge Source" as KS
   actor "Controller"       as Ctrl

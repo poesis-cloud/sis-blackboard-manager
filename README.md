@@ -1,7 +1,7 @@
-# SIE Definition Blackboard Manager
+# SIS Blackboard Manager
 
-[![CI](https://github.com/poesis-cloud/sie-definition-blackboard-manager/actions/workflows/ci.yaml/badge.svg)](https://github.com/poesis-cloud/sie-definition-blackboard-manager/actions/workflows/ci.yaml)
-[![Release](https://img.shields.io/github/v/release/poesis-cloud/sie-definition-blackboard-manager)](https://github.com/poesis-cloud/sie-definition-blackboard-manager/releases/latest)
+[![CI](https://github.com/poesis-cloud/sis-blackboard-manager/actions/workflows/ci.yaml/badge.svg)](https://github.com/poesis-cloud/sis-blackboard-manager/actions/workflows/ci.yaml)
+[![Release](https://img.shields.io/github/v/release/poesis-cloud/sis-blackboard-manager)](https://github.com/poesis-cloud/sis-blackboard-manager/releases/latest)
 [![Coverage gate](https://img.shields.io/badge/JaCoCo-%E2%89%A595%25%20instruction%20coverage%20enforced-brightgreen)](pom.xml)
 [![Java](https://img.shields.io/badge/Java-21-orange)](pom.xml)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F)](pom.xml)
@@ -10,18 +10,18 @@
 A **generic, domain-agnostic REST blackboard service** for collaborative
 definition sourcing.
 
-This service is part of the **SIE engine**. It owns the persisted blackboard
+This service is part of **SIS (Systemic Intelligence Sourcing)**. It owns the persisted blackboard
 data and the seal lifecycle that turns client-contributed hypotheses into a
 sealed, byte-stable, auditable contribution stream. It does not interpret any
 domain ontology and it does not reduce contributions: client sourcers (e.g.
-ITIP's repository definition sourcer) declare panels and slot schemas
+the SIS Code Sourcer) declare panels and slot schemas
 entirely as data via REST; client controllers reduce the sealed stream
 client-side.
 
 **Minimality**: the substrate is intentionally minimal -- it stores facts,
 validates per-slot, and seals. Concepts beyond that (e.g. dedupe, identity
 keys, evidence, contributor metadata) are client responsibilities and will
-be added to the substrate only if a concrete ITIP client need surfaces.
+be added to the substrate only if a concrete client need surfaces.
 
 > Repository was previously named `gsm-sourcer`. The engine-loaded "Pack"
 > model is gone: client sourcers now run in their own processes and speak
@@ -29,15 +29,15 @@ be added to the substrate only if a concrete ITIP client need surfaces.
 
 ---
 
-## 1. Role in SIE
+## 1. Role in SIS
 
 ```
 ┌───────────────────┐    HTTP/REST    ┌──────────────────────────────┐
-│ Client sourcer    │ ──────────────► │  Definition Blackboard       │
-│ (e.g. ITIP        │                 │  Manager  (this service)     │
-│  repository       │ ◄────────────── │                              │
-│  definition       │   sealed        │  - Blackboard resource       │
-│  sourcer)         │   contribution  │  - Panel / Slot registry     │
+│ Client sourcer    │ ──────────────► │  SIS Blackboard Manager      │
+│ (e.g. SIS         │                 │  (this service)              │
+│  Code Sourcer)    │ ◄────────────── │                              │
+│                   │   sealed        │  - Blackboard resource       │
+│                   │   contribution  │  - Panel / Slot registry     │
 └─────────┬─────────┘   stream        │  - Contribution validation   │
           │                           │  - Blackboard-seal state     │
           │ client controller +       │    machine (server-owned)    │
@@ -215,7 +215,7 @@ Everything else is client controller territory.
 
 The end-to-end REST sequence diagram (client-driven) lives in the
 first client sourcer that exercises this service:
-[itip-definition-blackboard-repository-sourcer/def/blackboard-workflow.puml](../../itip/itip-definition-blackboard-repository-sourcer/def/blackboard-workflow.puml).
+[sis-code-sourcer/def/blackboard-workflow.puml](../../sis/sis-code-sourcer/def/blackboard-workflow.puml).
 
 ---
 
@@ -242,8 +242,8 @@ Deliberately out of scope (client-side concerns):
   same-Blackboard `derivedContribution` lineage).
 
 These were all part of the previous engine-loaded "Pack" model. They now
-live in client sourcer repositories (the first one being ITIP's
-[itip-definition-blackboard-repository-sourcer](../../itip/itip-definition-blackboard-repository-sourcer/)).
+live in client sourcer repositories (the first one being SIS's
+[sis-code-sourcer](../../sis/sis-code-sourcer/)).
 
 ---
 
@@ -261,6 +261,6 @@ no implementation in this phase.
 ## 10. Skill
 
 The corresponding Copilot skill is at
-[.github/skills/definition-blackboard-manager/SKILL.md](../../.github/skills/definition-blackboard-manager/SKILL.md).
+[.github/skills/blackboard-manager/SKILL.md](../../.github/skills/blackboard-manager/SKILL.md).
 It is the authoritative reference for both the service and the
 client sourcer authoring contract.

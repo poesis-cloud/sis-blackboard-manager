@@ -6,7 +6,7 @@ SHELL := /bin/bash
 -include .env
 -include .env.dev
 
-NAMESPACE ?= sie
+NAMESPACE ?= sis
 DEPLOY_ENV ?= preprod
 RELEASE_DEF_BB_DB ?= sie-definition-blackboard-database
 
@@ -51,16 +51,16 @@ dev-up:
 	@: "$${DB_USER:?Missing DB_USER in .env.dev}"
 	@: "$${DB_PASSWORD:?Missing DB_PASSWORD in .env.dev}"
 	kubectl get ns $(NAMESPACE) >/dev/null 2>&1 || kubectl create ns $(NAMESPACE) >/dev/null
-	helm upgrade --install sie-definition-blackboard-manager $(BBM_CHART) -n $(NAMESPACE) --create-namespace --wait --timeout 5m0s \
+	helm upgrade --install sis-blackboard-manager $(BBM_CHART) -n $(NAMESPACE) --create-namespace --wait --timeout 5m0s \
 		-f $(BBM_CHART)/environments/dev/values.yaml
 	@if [[ -f "$(PORT_FORWARD_PID_FILE)" ]]; then \
 		xargs -r kill < "$(PORT_FORWARD_PID_FILE)" 2>/dev/null || true; \
 		rm -f "$(PORT_FORWARD_PID_FILE)"; \
 	fi
 	$(call kill_port_listener,5432)
-	nohup kubectl -n $(NAMESPACE) port-forward svc/$(RELEASE_DEF_BB_DB) 5432:5432 >/tmp/sie-bbm-pf-db.log 2>&1 & echo $$! >> "$(PORT_FORWARD_PID_FILE)"
+	nohup kubectl -n $(NAMESPACE) port-forward svc/$(RELEASE_DEF_BB_DB) 5432:5432 >/tmp/sis-bbm-pf-db.log 2>&1 & echo $$! >> "$(PORT_FORWARD_PID_FILE)"
 	@sleep 2
-	@grep -q "Forwarding from 127.0.0.1:5432" /tmp/sie-bbm-pf-db.log || { echo "Database port-forward failed. See /tmp/sie-bbm-pf-db.log"; exit 1; }
+	@grep -q "Forwarding from 127.0.0.1:5432" /tmp/sis-bbm-pf-db.log || { echo "Database port-forward failed. See /tmp/sis-bbm-pf-db.log"; exit 1; }
 	@echo "Dependencies are ready and port-forwards started."
 	@echo "Now run: make run-api"
 
@@ -74,7 +74,7 @@ dev-down:
 		xargs -r kill < "$(PORT_FORWARD_PID_FILE)" 2>/dev/null || true; \
 		rm -f "$(PORT_FORWARD_PID_FILE)"; \
 	fi
-	helm uninstall sie-definition-blackboard-manager -n $(NAMESPACE) || true
+	helm uninstall sis-blackboard-manager -n $(NAMESPACE) || true
 
 run-api:
 	DB_URL="$(DB_URL)" \
@@ -84,7 +84,7 @@ run-api:
 
 prod-deploy:
 	@$(MAKE) deploy-check
-	helm upgrade --install sie-definition-blackboard-manager $(BBM_CHART) -n $(NAMESPACE) --create-namespace --wait --timeout 10m0s \
+	helm upgrade --install sis-blackboard-manager $(BBM_CHART) -n $(NAMESPACE) --create-namespace --wait --timeout 10m0s \
 		-f $(BBM_ENV_FILE) \
 		--set image.repository="$${IMAGE_REPOSITORY}" \
 		--set image.tag="$${IMAGE_TAG}" \

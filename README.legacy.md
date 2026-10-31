@@ -418,7 +418,7 @@ Cross-cutting technical concerns extracted from code annotations, configuration,
 
 ## UI Integration
 
-The GSM Sourcer is triggerable from the ITIP UI (and future domain app UIs):
+The GSM Sourcer is triggerable from the OIP UI (and future domain app UIs):
 
 | UI Element | Behavior |
 | --- | --- |

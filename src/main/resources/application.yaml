@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: sie-definition-blackboard-manager
+    name: sis-blackboard-manager
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/sie_definition_blackboard}
     username: ${DB_USER:sie}

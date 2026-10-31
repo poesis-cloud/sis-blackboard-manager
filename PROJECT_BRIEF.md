@@ -1,13 +1,13 @@
-# PROJECT_BRIEF.md — sie-definition-blackboard-manager
+# PROJECT_BRIEF.md — sis-blackboard-manager
 
 > Last updated: 2025-07 | Sprint 0 | Status: Bootstrapping
 
 ## 1. Project Overview
 
-`sie-definition-blackboard-manager` is the **server-side REST blackboard service** for collaborative
-GSM definition sourcing within the Systemic Intelligence Engine (SIE). It manages the full lifecycle
+`sis-blackboard-manager` is the **server-side REST blackboard service** for collaborative
+GSM definition sourcing within Systemic Intelligence Sourcing (SIS). It manages the full lifecycle
 of a Blackboard: from open contribution intake, through sealing, to byte-stable immutable output.
-Consumed by client sourcers (e.g., `itip-definition-blackboard-repository-sourcer`); clients post
+Consumed by client sourcers (e.g., `sis-code-sourcer`); clients post
 contributions, the server controls state.
 
 The service enforces the Blackboard isolation invariant: once sealed, no mutation is permitted.
@@ -36,7 +36,7 @@ Client flow:
 
 - **Language / Runtime:** Java 21
 - **Framework:** Spring Boot 3.5.x (Web, HATEOAS, Data JPA)
-- **Build:** Maven (`cloud.poesis.sie:sie-definition-blackboard-manager:1.0.0-beta.1`)
+- **Build:** Maven (`cloud.poesis.sis:sis-blackboard-manager:1.0.0-beta.1`)
 - **Database:** PostgreSQL (managed by companion repo `sie-definition-blackboard-database`)
 - **Testing:** JUnit 5, Testcontainers (Postgres), Mockito; JaCoCo >= 95% instruction coverage
 - **Container:** Docker (Dockerfile at repo root)
@@ -48,12 +48,12 @@ Client flow:
 
 ```
 +------------------------------------------------------------------+
-|  Clients (e.g. itip-definition-blackboard-repository-sourcer)   |
+|  Clients (e.g. sis-code-sourcer)   |
 |  REST HTTP calls (Spring HATEOAS hypermedia links)               |
 +------------------------------+-----------------------------------+
                                | HTTPS / REST
 +------------------------------v-----------------------------------+
-|  sie-definition-blackboard-manager  (Spring Boot 3 / Java 21)   |
+|  sis-blackboard-manager  (Spring Boot 3 / Java 21)   |
 |                                                                  |
 |  BlackboardController   -- CRUD + seal lifecycle                 |
 |  ContributionController -- POST/GET contributions                |
@@ -79,8 +79,8 @@ Client flow:
 | Maven build | `pom.xml` | Dependencies, Java 21, Spring Boot 3.5 |
 | SpotBugs exclusions | `spotbugs-exclude.xml` | Static analysis suppressions |
 | Domain definitions | `def/` | GSM-aligned JSON schemas / design artifacts |
-| Java source | `src/main/java/cloud/poesis/sie/blackboard/` | Application code |
-| Java tests | `src/test/java/cloud/poesis/sie/blackboard/` | Unit + integration tests |
+| Java source | `src/main/java/cloud/poesis/sis/bbman/` | Application code |
+| Java tests | `src/test/java/cloud/poesis/sis/bbman/` | Unit + integration tests |
 | Dockerfile | `Dockerfile` | Container image |
 | Helm chart | `ops/helm/` | Kubernetes deployment (gap — not yet created) |
 | CI workflow | `.github/workflows/ci.yaml` | Maven build, lint, test (gap) |
@@ -92,7 +92,7 @@ Client flow:
 | Agent | Name | Role |
 |-------|------|------|
 | Producer | **Remy** | Sprint plans, GitHub Issues, PR coordination. Never writes application code. Skills: `product-manager`, `create-pr`, `update-pr`, `sync`, `commit`, `chronicle` |
-| Dev | **Nova / Sage / Milo** | REST API, Blackboard lifecycle, contribution validation, audit ledger. Skills: `definition-blackboard-manager`, `gsm-knowledge`, `context-map`, `refactor-plan`, `commit`, `create-pr` |
+| Dev | **Nova / Sage / Milo** | REST API, Blackboard lifecycle, contribution validation, audit ledger. Skills: `blackboard-manager`, `gsm-knowledge`, `context-map`, `refactor-plan`, `commit`, `create-pr` |
 | QA | **Ivy** | Seal lifecycle tests, contribution validation, audit integrity, JaCoCo >= 95%. Skills: `code-review`, `commit` |
 
 ## 7. Sprint Status
@@ -138,7 +138,7 @@ Client flow:
 
 ```bash
 # Prerequisites: Java 21, Maven, Docker (for Testcontainers)
-cd /home/clem/repositories/poesis/sie/sie-definition-blackboard-manager
+cd /home/clem/repositories/poesis/sis/sis-blackboard-manager
 mvn clean verify        # build + test (Testcontainers spins up Postgres automatically)
 mvn spring-boot:run     # run locally (requires a Postgres instance)
 ```
@@ -153,7 +153,7 @@ make prod-deploy    # deploy to prod
 
 CI/CD pipelines (once created):
 - `ci.yaml`: triggered on every push — Maven build + test + SpotBugs + Helm lint
-- `cd.yaml`: manually triggered — Azure OIDC login + `helm upgrade --install` (namespace: `sie`)
+- `cd.yaml`: manually triggered — Azure OIDC login + `helm upgrade --install` (namespace: `sis`)
 
 ## 12. Cross-Chat Handoff Protocol
 
@@ -166,7 +166,7 @@ The repo is the shared memory. If skipped, the next chat starts blind.
 
 ## 13. Bug & Fix Tracking
 
-Bugs tracked as GitHub Issues on `poesis-cloud/sie-definition-blackboard-manager`.
+Bugs tracked as GitHub Issues on `poesis-cloud/sis-blackboard-manager`.
 
 **QA (Ivy):** File bugs with labels (`bug`, `severity:blocker/major/minor`). When no blockers:
 write `docs/qa/sprint-N-signoff.md` with test count, pass rate, "no blockers" statement.
@@ -183,7 +183,7 @@ Never squash or rebase feature branches (causes commit loss).
 **Branches:** `feature/sprint-N` (dev), `feature/qa-N` (QA), `main` (Remy coordination).
 
 ```bash
-git clone git@github.com:poesis-cloud/sie-definition-blackboard-manager.git <folder>
+git clone git@github.com:poesis-cloud/sis-blackboard-manager.git <folder>
 cd <folder> && git checkout -b <branch>
 ```
 
@@ -192,4 +192,4 @@ cd <folder> && git checkout -b <branch>
 | Repo | Role |
 |------|------|
 | `sie-definition-blackboard-database` | PostgreSQL schema, Helm/ops only — paired DB repo |
-| `itip-definition-blackboard-repository-sourcer` | Client sourcer — posts contributions |
+| `sis-code-sourcer` | Client sourcer — posts contributions |

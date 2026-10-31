@@ -1,4 +1,4 @@
-name: definition-blackboard-manager-ci
+name: blackboard-manager-ci
 
 on:
   push:

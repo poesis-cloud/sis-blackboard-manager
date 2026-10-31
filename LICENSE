@@ -9,8 +9,8 @@ Parameters
 
 Licensor:             Clément Cazaud
 
-Licensed Work:        SIE Definition Blackboard Manager
-                      (sie-definition-blackboard-manager) — the server-side
+Licensed Work:        SIS Blackboard Manager
+                      (sis-blackboard-manager) — the server-side
                       REST blackboard service for collaborative definition
                       sourcing in this repository. The Licensed Work is
                       (c) 2026 Clément Cazaud.
@@ -67,7 +67,7 @@ This License does not grant you any right in any trademark or logo of
 Licensor or its affiliates (provided that you may use a trademark or logo of
 Licensor as expressly required by this License). The names "Poesis",
 "Generative System Model (GSM)", "Systemic Intelligence Engine (SIE)", and
-"IT Intelligence Platform (ITIP)" are trademarks of the Licensor; see
+"Organizational Intelligence Platform (OIP)" are trademarks of the Licensor; see
 TRADEMARK.md for the trademark policy.
 
 TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSED WORK IS PROVIDED ON
