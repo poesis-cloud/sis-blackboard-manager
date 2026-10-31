@@ -1,4 +1,4 @@
-# Copilot Instructions — sie-definition-blackboard-manager
+# Copilot Instructions — sis-blackboard-manager
 
 This is the **server-side REST blackboard service** for collaborative GSM definition sourcing.
 Read `PROJECT_BRIEF.md` at the repo root for full context before starting any task.
@@ -13,7 +13,7 @@ Skills: `product-manager`, `create-pr`, `update-pr`, `sync`, `commit`, `chronicl
 
 ### Nova / Sage / Milo (Dev)
 Implement the server REST API, Blackboard lifecycle, contribution validation, and audit ledger.
-Skills: `definition-blackboard-manager`, `gsm-knowledge`, `agent-customization`, `update-skills`,
+Skills: `blackboard-manager`, `gsm-knowledge`, `agent-customization`, `update-skills`,
 `commit`, `create-pr`, `context-map`, `refactor-plan`
 
 ### Ivy (QA)
@@ -92,7 +92,7 @@ ops/
 ```
 No `ops/helm/values.yaml` at chart root — values live only under `environments/`.
 Makefile targets: `dev-up`, `dev-down`, `dev-check`, `prod-deploy`, `package-helm`.
-Namespace: `sie`.
+Namespace: `sis`.
 
 ### YAML naming
 Use `.yaml` for all YAML files. Do not add new `.yml` files.
@@ -102,8 +102,8 @@ Use `.yaml` for all YAML files. Do not add new `.yml` files.
 ## Tech Stack Quick Reference
 
 - Java 21, Spring Boot 3.5.x, Maven
-- GroupId: `cloud.poesis.sie`, ArtifactId: `sie-definition-blackboard-manager`
-- PostgreSQL via companion repo `sie-definition-blackboard-database`
+- GroupId: `cloud.poesis.sis`, ArtifactId: `sis-blackboard-manager`
+- PostgreSQL via companion repo `sis-blackboard-database`
 - Kubernetes / AKS, Helm; Testcontainers for integration tests
 - SpotBugs (`spotbugs-exclude.xml`)
 

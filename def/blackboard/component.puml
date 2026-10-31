@@ -22,7 +22,7 @@ skinparam databaseBorderColor #57606A
 skinparam noteBackgroundColor #FFF8C5
 skinparam noteBorderColor #57606A
 
-frame "PD - Definition Blackboard Manager - Component view" {
+frame "PD - Blackboard Manager - Component view" {
 
   actor "Knowledge Source" as A_KS
   actor "Controller"       as A_Ctrl

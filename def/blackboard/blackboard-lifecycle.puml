@@ -18,7 +18,7 @@ skinparam state {
 skinparam noteBackgroundColor #FFF8C5
 skinparam noteBorderColor #57606A
 
-title Definition Blackboard Manager - Blackboard lifecycle (server-owned)
+title Blackboard Manager - Blackboard lifecycle (server-owned)
 
 note as N_Scope
   **Scope** -- State machine for one `Blackboard`. There is no Run,

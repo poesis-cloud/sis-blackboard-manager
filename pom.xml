@@ -10,11 +10,11 @@
     <relativePath/>
   </parent>
 
-  <groupId>cloud.poesis.sie</groupId>
-  <artifactId>sie-definition-blackboard-manager</artifactId>
+  <groupId>cloud.poesis.sis</groupId>
+  <artifactId>sis-blackboard-manager</artifactId>
   <version>1.0.0-beta.1</version>
-  <name>sie-definition-blackboard-manager</name>
-  <description>SIE Definition Blackboard Manager service</description>
+  <name>sis-blackboard-manager</name>
+  <description>SIS Blackboard Manager service</description>
 
   <properties>
     <java.version>21</java.version>

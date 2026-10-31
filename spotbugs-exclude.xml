@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  SpotBugs exclusion filter for sie-definition-blackboard-manager.
+  SpotBugs exclusion filter for sis-blackboard-manager.
 
   Every entry is a verified false positive caused by a framework constraint
   where a root-cause fix is impossible.
@@ -28,22 +28,22 @@
   <!-- JPA-managed @OneToMany collection getters -->
   <Match>
     <Bug pattern="EI_EXPOSE_REP"/>
-    <Class name="cloud.poesis.sie.bbman.entity.BlackboardEntity"/>
+    <Class name="cloud.poesis.sis.bbman.entity.BlackboardEntity"/>
     <Method name="getPanels"/>
   </Match>
   <Match>
     <Bug pattern="EI_EXPOSE_REP"/>
-    <Class name="cloud.poesis.sie.bbman.entity.PanelEntity"/>
+    <Class name="cloud.poesis.sis.bbman.entity.PanelEntity"/>
     <Method name="getSlots"/>
   </Match>
   <Match>
     <Bug pattern="EI_EXPOSE_REP"/>
-    <Class name="cloud.poesis.sie.bbman.entity.ContributionSlotEntity"/>
+    <Class name="cloud.poesis.sis.bbman.entity.ContributionSlotEntity"/>
     <Method name="getContributions"/>
   </Match>
   <Match>
     <Bug pattern="EI_EXPOSE_REP"/>
-    <Class name="cloud.poesis.sie.bbman.entity.ContributionEntity"/>
+    <Class name="cloud.poesis.sis.bbman.entity.ContributionEntity"/>
     <Method name="getDerivedContributions"/>
   </Match>
 

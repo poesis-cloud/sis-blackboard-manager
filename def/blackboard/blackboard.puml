@@ -23,14 +23,14 @@ skinparam classFontColor #24292F
 skinparam noteBackgroundColor #FFF8C5
 skinparam noteBorderColor #57606A
 
-frame "CD - Definition Blackboard Manager - Server-side data model" {
+frame "CD - Blackboard Manager - Server-side data model" {
 
   ' ============================================================
   ' DBM NOTE
   ' ============================================================
 
   note as DbmNote
-    **DBM -- Definition Blackboard Manager (Server-side data model)**
+    **DBM -- Blackboard Manager (Server-side data model)**
 
     Generic, domain-agnostic blackboard substrate. The single top-level
     resource is `Blackboard`. The service is a **passive store of facts**:
@@ -46,7 +46,7 @@ frame "CD - Definition Blackboard Manager - Server-side data model" {
     holds no hardcoded domain concept, no resolver, no merge logic.
 
     **Minimality**: this model is intentionally minimal; it will be
-    enriched only when concrete needs surface on the ITIP client side.
+    enriched only when concrete needs surface on the client side.
 
     Lifecycle invariants enforced server-side:
     - Panel topology is **frozen** when the first contribution is
