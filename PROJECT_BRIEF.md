@@ -37,7 +37,7 @@ Client flow:
 - **Language / Runtime:** Java 21
 - **Framework:** Spring Boot 3.5.x (Web, HATEOAS, Data JPA)
 - **Build:** Maven (`cloud.poesis.sis:sis-blackboard-manager:1.0.0-beta.1`)
-- **Database:** PostgreSQL (managed by companion repo `sie-definition-blackboard-database`)
+- **Database:** PostgreSQL (managed by companion repo `sis-blackboard-database`)
 - **Testing:** JUnit 5, Testcontainers (Postgres), Mockito; JaCoCo >= 95% instruction coverage
 - **Container:** Docker (Dockerfile at repo root)
 - **Orchestration:** Kubernetes / AKS, Helm (`ops/helm/` — gap, not yet created)
@@ -67,7 +67,7 @@ Client flow:
 +------------------------------+-----------------------------------+
                                | JDBC / JPA
 +------------------------------v-----------------------------------+
-|  sie-definition-blackboard-database  (PostgreSQL, companion)     |
+|  sis-blackboard-database  (PostgreSQL, companion)                |
 |  Tables: blackboard, panel, contribution, audit_entry            |
 +------------------------------------------------------------------+
 ```
@@ -191,5 +191,5 @@ cd <folder> && git checkout -b <branch>
 
 | Repo | Role |
 |------|------|
-| `sie-definition-blackboard-database` | PostgreSQL schema, Helm/ops only — paired DB repo |
+| `sis-blackboard-database` | PostgreSQL schema, Helm/ops only — paired DB repo |
 | `sis-code-sourcer` | Client sourcer — posts contributions |

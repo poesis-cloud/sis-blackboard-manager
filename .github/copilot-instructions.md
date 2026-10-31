@@ -103,7 +103,7 @@ Use `.yaml` for all YAML files. Do not add new `.yml` files.
 
 - Java 21, Spring Boot 3.5.x, Maven
 - GroupId: `cloud.poesis.sis`, ArtifactId: `sis-blackboard-manager`
-- PostgreSQL via companion repo `sie-definition-blackboard-database`
+- PostgreSQL via companion repo `sis-blackboard-database`
 - Kubernetes / AKS, Helm; Testcontainers for integration tests
 - SpotBugs (`spotbugs-exclude.xml`)
 

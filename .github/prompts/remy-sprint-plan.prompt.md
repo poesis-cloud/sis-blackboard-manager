@@ -54,7 +54,7 @@ When planning tasks that touch write paths, always include:
 
 ## Companion repos to coordinate with
 
-- `sie-definition-blackboard-database`: schema migrations may be needed
+- `sis-blackboard-database`: schema migrations may be needed
 - `sis-code-sourcer`: client-side changes may be triggered by API changes
 
 After creating the plan, update `PROJECT_BRIEF.md` Section 7 with the new sprint row.

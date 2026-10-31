@@ -8,7 +8,7 @@ SHELL := /bin/bash
 
 NAMESPACE ?= sis
 DEPLOY_ENV ?= preprod
-RELEASE_DEF_BB_DB ?= sie-definition-blackboard-database
+RELEASE_DEF_BB_DB ?= sis-blackboard-database
 
 BBM_CHART ?= ./ops/helm
 BBM_ENV_FILE ?= $(BBM_CHART)/environments/$(DEPLOY_ENV)/values.yaml
