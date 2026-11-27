@@ -264,3 +264,10 @@ The corresponding Copilot skill is at
 [.github/skills/blackboard-manager/SKILL.md](../../.github/skills/blackboard-manager/SKILL.md).
 It is the authoritative reference for both the service and the
 client sourcer authoring contract.
+
+<!-- roadmap:start -->
+## Roadmap
+
+![Roadmap](docs/roadmap.svg)
+
+<!-- roadmap:end -->
