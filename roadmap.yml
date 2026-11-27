@@ -1,0 +1,6 @@
+scope: product
+name: SIS Blackboard Manager
+repos: [sis-blackboard-manager, sis-blackboard-database]
+milestones:
+  - version: v1.0.0
+    current: true
